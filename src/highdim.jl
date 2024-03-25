@@ -26,7 +26,7 @@ function L_op(u,dt,dx)
                 x_diff = (1/dx^2)*(u[x-1,y,t]-2*u[x,y,t]+u[x+1,y,t])
                 y_diff = (1/dx^2)*(u[x,y-1,t]-2*u[x,y,t]+u[x,y+1,t])
                 xy_diff = x_diff + y_diff
-                Lu[x,y,t] = t_diff - 1/2 * xy_diff*1/dx^2
+                Lu[x,y,t] = t_diff - 1/2 * xy_diff
             end
         end
     end
@@ -112,7 +112,18 @@ function test()
         df_partial=partial_integration(solution,dt,dx,xquot,tquot,epsilon)
         df = vcat(df,df_partial)
     end
-    return df,solution
+    max_size_df = min(50000,size(df,1))
+    rand_rows = sample(1:size(df,1),max_size_df,replace=false)
+    df=df[rand_rows,:]
+    println(size(df,1))
+    mach = train_tuned(df)
+    N=10000
+    domain=(2,6)
+    #l1,l2 = get_all_losses(mach,truth,domain,N)
+    fulld = copy(spde_params)
+    #fulld["l1"] = l1
+    #fulld["l2"] = l2
+    return mach,fulld,truth,df
 end
 
 function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
@@ -183,6 +194,28 @@ function noise!(du,u,p,t)
             du[i,j] = σ(u[i,j])*sqrt(1/dx^2)
         end
     end
+end
+
+function train_tuned(df)
+	df_filtered = filter(row -> row.x < 15, df)
+	#df_train,df_test = partition(df_filtered  ,0.8,rng=123)
+	x_data = select(df_filtered,1)
+	y_data = df_filtered.y #.* nx/t_quot
+    max_nbors = min(1500,length(df.x))
+	knn=KNN()
+	knn_r1=range(knn,:K,lower=20,upper=max_nbors)
+	knn_r2=range(knn,:leafsize,lower=50,upper=100)
+	knn_r3 = range(knn,:weights,values=[NearestNeighborModels.Dudani(),NearestNeighborModels.Uniform(),
+	NearestNeighborModels.DualD(),NearestNeighborModels.DualU()])
+	knn_tuned = TunedModel(model=knn,
+	resampling=CV(nfolds=5),
+	tuning=Grid(goal=6),
+	range=[knn_r1,knn_r2],measure=rms,
+	acceleration=CPUThreads(),
+	acceleration_resampling=CPUThreads());
+    mach = machine(knn_tuned,x_data,y_data)
+    fit!(mach)
+    return mach
 end
 
 
