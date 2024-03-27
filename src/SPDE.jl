@@ -74,21 +74,9 @@ function get_drift_diffusion()
 	end
 	return heat_drift!,heat_diffusion_noise!
 end
-    #=
-    @show new_nx = nx ÷ x_quot
-    @show new_nt = nt ÷ t_quot
-    @show new_dx = x_quot*dx
-    @show new_dt = t_quot*dt
-    @show x_eps = (eps ÷ new_dx) |> Int
-    @show t_eps = (eps ÷ new_dt) |> Int
-    println("new_nx= $new_nx")
-    println("new_nt= $new_nt")
-    println("x_eps= $x_eps")
-    println("r_eps= $t_eps")
-    =#
 
-    #df = DataFrame(:x=>Float64[],:y => Float64[])
-    #@show a,b = size(solution)
+# this function takes a full solution and rescales dx and dt by x_quot and t_quot,
+# it then does the estimation with epsilon = eps
 function partial_integration(solution,dt,dx,L,tmax,x_quot,t_quot,eps)
     nx,nt = size(solution)
     #df = DataFrame(:x=>Float64[],:y => Float64[])
@@ -103,8 +91,7 @@ function partial_integration(solution,dt,dx,L,tmax,x_quot,t_quot,eps)
     new_sol = solution[x_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
     new_dx = x_quot*dx
     new_dt = t_quot*dt
-    Lu_clean = L_op(new_sol,new_dt,new_dx) #.* sqrt(dx*dt) 
-    Lu = Lu_clean
+    Lu = L_op(new_sol,new_dt,new_dx) #.* sqrt(dx*dt) 
     #Lu = Lu * 1/sqrt(eps) * new_dx # no time
     Lu .= Lu * 1/eps * new_dx * new_dt # with time
     buffer = 1#2^13 ÷ t_quot
@@ -190,7 +177,7 @@ function main_exp(spde_params)
     sigmas = Dict("sigma1"=>sigma_1,"sigma2"=>sigma_2,"sigma3"=>sigma_3,"sigma4"=>sigma_4)
     @unpack xquot, tquot, epsilon, sigma = spde_params
     σ = sigmas[sigma]  #sigmas[sigma]
-    L=1
+    L=1 # right boundary of space
     tmax = 0.3;
 	#σ = x-> 0.5*sin(2pi*x/6)
     h=2^9
