@@ -2,7 +2,9 @@ name = "SPDE"
 
 [deps]
 AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
+AlgebraicMultigrid = "2169fc97-5a83-5252-b627-83903c6c433c"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
 ClipData = "39db22c5-8506-4ef9-b8dc-9d8ef5f2b71d"

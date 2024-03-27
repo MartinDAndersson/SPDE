@@ -341,12 +341,12 @@ function main_exp(spde_params)
     #ϵ = 2dx
 	#figname = "0.5x"
 	samples = 1;
-    solution = generate_solution(σ)
-    println(size(solution))
+    #solution = generate_solution(σ)
+    #println(size(solution))
     df = DataFrame(:x=>Float64[],:y=>Float64[])
     while size(df,1) < 20000
         solution = generate_solution(σ)
-        df_partial=SPDE.partial_integration(Matrix(solution),dt,dx,L,tmax,xquot,tquot,epsilon)
+        df_partial=SPDE.partial_integration(Matrix(solution),dt,dx,L,tmax,xquot,tquot,epsilon*dx)
         df = vcat(df,df_partial)
     end
     max_size_df = min(50000,size(df,1))
@@ -364,7 +364,8 @@ function main_exp(spde_params)
 end
 
 function generate_solution(σ)
-    algo = ImplicitEM(linsolve = KLUFactorization())
+    #algo = ImplicitEM(linsolve = KLUFactorization())
+    algo=SRIW1()
     L=1; 
 	tmax = 0.3;
 	h=2^9
