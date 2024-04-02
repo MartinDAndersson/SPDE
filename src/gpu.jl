@@ -30,7 +30,7 @@ function test(N,nt)
     #AMy = zeros(N, N);
     #DA = zeros(N, N);
     D = 0.5*1/dx^2
-    Dnoise = sqrt(1/dx)
+    Dnoise = sqrt(1/dx^2)
 
     function f(du,u,p,t)
         mul!(MyA,My,u)
@@ -43,7 +43,7 @@ function test(N,nt)
     end
     #prob = ODEProblem(f, u0, (0.0, 100.0))
    # @time sol = solve(prob, ROCK2(), progress = true, save_everystep = false, save_start = false)
-    σ(x) = x
+    σ(x) = 0.5*x
     gMx = CuArray(Float32.(Mx))
     gMy = CuArray(Float32.(Mx))
     # gα₁ = CuArray(Float32.(α₁))
@@ -76,7 +76,7 @@ function test(N,nt)
     #save_dt = 
     @time sol = solve(prob,saveat=t_idxs,dt=dt, SROCK1(),progress=true);
 
-    return Array(sol)
+    return sol
 end
 
 end
