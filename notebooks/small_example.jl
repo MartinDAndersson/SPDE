@@ -20,11 +20,14 @@ using DrWatson
 # ╔═╡ 5b93904b-c46b-4285-87a0-f703ef3b0182
 @quickactivate
 
+# ╔═╡ ebe839c2-c839-40e4-a143-b3ee8dae2918
+push!(LOAD_PATH,srcdir())
+
 # ╔═╡ 56bd2b02-9b69-4531-9cf5-b6d30c7ecae7
 using Revise,SPDE, MLJ,Plots,PlutoUI
 
-# ╔═╡ ebe839c2-c839-40e4-a143-b3ee8dae2918
-
+# ╔═╡ e03eb08c-a903-4a21-bb2d-204b731268f7
+using highdim
 
 # ╔═╡ 5b26d15a-2440-41b4-a17b-4b8a4325332d
 dic=Dict(
@@ -52,6 +55,21 @@ xvec = range(0,1,length=xs)
 
 # ╔═╡ afa7f850-cb0d-40b3-ae1a-c441ba9a46cd
 plot(xvec,sol[:,t])
+
+# ╔═╡ e9f0d8c8-cc87-4e5e-a026-cff29593493f
+# ╠═╡ disabled = true
+#=╠═╡
+
+  ╠═╡ =#
+
+# ╔═╡ cacd6eac-ff99-485a-9a5b-99e3c4d498c3
+solcpu = highdim.gpu_generation(sin,2^7,2^16)
+
+# ╔═╡ 3041f745-98a4-43d2-a226-5aa9774d3a5d
+xc,yc,tc=size(solcpu)
+
+# ╔═╡ 4f684e58-cebf-4c79-95b3-355e71ee4b0c
+plot(range(0,1,length=xc),range(0,1,length=yc),solcpu[:,:,1],st=:surface)
 
 # ╔═╡ f811b347-3234-460a-9897-0a01a8f9a3c5
 mach,fulld,truth,df=SPDE.main_exp(dic)
@@ -88,6 +106,7 @@ end
 # ╠═49cbdcdc-eb6e-11ee-2c8c-fb46a6dd2099
 # ╠═5b93904b-c46b-4285-87a0-f703ef3b0182
 # ╠═ebe839c2-c839-40e4-a143-b3ee8dae2918
+# ╠═e03eb08c-a903-4a21-bb2d-204b731268f7
 # ╠═56bd2b02-9b69-4531-9cf5-b6d30c7ecae7
 # ╠═5b26d15a-2440-41b4-a17b-4b8a4325332d
 # ╠═3ddb6aee-35ef-43e8-ae80-641313d626f5
@@ -96,6 +115,10 @@ end
 # ╠═e3d7293e-e7ad-4f09-99ee-705f32aa23ef
 # ╠═31cb39c3-0121-4998-9b98-6b4bd3a0c7aa
 # ╠═afa7f850-cb0d-40b3-ae1a-c441ba9a46cd
+# ╠═e9f0d8c8-cc87-4e5e-a026-cff29593493f
+# ╠═cacd6eac-ff99-485a-9a5b-99e3c4d498c3
+# ╠═3041f745-98a4-43d2-a226-5aa9774d3a5d
+# ╠═4f684e58-cebf-4c79-95b3-355e71ee4b0c
 # ╠═f811b347-3234-460a-9897-0a01a8f9a3c5
 # ╠═4f73fcd2-1f48-4c89-a35e-5269099066df
 # ╠═bb42cfc3-833a-4916-b3ac-72c4f48dd246
