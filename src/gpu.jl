@@ -43,7 +43,7 @@ function test(N,nt)
     end
     #prob = ODEProblem(f, u0, (0.0, 100.0))
    # @time sol = solve(prob, ROCK2(), progress = true, save_everystep = false, save_start = false)
-    σ(x) = 0.5*x
+    σ(x) = sqrt(dx)*0.5*x
     gMx = CuArray(Float32.(Mx))
     gMy = CuArray(Float32.(Mx))
     # gα₁ = CuArray(Float32.(α₁))
@@ -56,6 +56,8 @@ function test(N,nt)
     edges[:,1] .= 0
     edges[:,end] .= 0
     gedges = CuArray(Float32.(edges))
+    riez = [sqrt(abs(x-y)) for x in 0:dx:1,y in 0:dx:1]
+    riez = CuArray(Float32.(riez))
     function gf(du,u,p,t)
         mul!(gMyA,gMy,u)
         mul!(AgMx,u,gMx)
@@ -64,7 +66,7 @@ function test(N,nt)
     end
 
     function gnoise(du,u,p,t)
-        @. du = σ.(u) * Dnoise
+        @. du = σ.(u) .* Dnoise #.* riez
     end
 
     prob2 = ODEProblem(gf, gu0, (0.0, 0.3))
@@ -72,11 +74,15 @@ function test(N,nt)
     #@time sol = solve(prob2, ROCK2(), progress = true,save_everystep = false, dt = dt,save_start = false);
     prob = SDEProblem(gf, gnoise, gu0, (0.0, 0.3))
     #tquot = 
-    t_idxs = 0.1:dt:0.3
+    t_idxs = 0.05:dt:0.3
     #save_dt = 
-    @time sol = solve(prob,saveat=t_idxs,dt=dt, SROCK1(),progress=true);
+    eps=10
+    xmid = N ÷ 8
+    #ymid# = (end - (nx ÷ 8))
+    x_idxs= CartesianIndices((xmid-eps:xmid+eps,xmid-eps:ymid+eps))
+    @time sol = solve(prob,saveat=t_idxs,dt=dt,save_idxs=x_idxs, SROCK1(),progress=true);
 
-    return sol
+    return Array(sol)
 end
 
 end
