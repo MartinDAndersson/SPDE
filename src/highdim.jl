@@ -9,7 +9,6 @@ using DrWatson
 using NearestNeighborModels
 #using ScikitLearn.GridSearch: GridSearchCV
 using ProgressMeter
-using Trapz
 using Symbolics
 using CUDA
 KNN = MLJ.@load KNNRegressor
@@ -36,9 +35,12 @@ end
 #2^27
 function generate_solution(σ,h,nt)
     #algo = ImplicitRKMil(linsolve = KLUFactorization())#(linsolve = KLUFactorization())
-    algo = SRIW1()
+    algo = SROCK1()
+    #algo=ImplicitEM(linsolve = KLUFactorization())
     L=1; 
-	tmax = 0.3;
+	#tmax = 0.3;
+    tmax=0.4
+    t0=0.
 	#h=2^6
     N=h
 	nx = h;
@@ -49,7 +51,6 @@ function generate_solution(σ,h,nt)
 	u_begin = 6*ones(nx,nx)
 	u_begin[1,:] .= 0; u_begin[end,:] .= 0; u_begin[:,1] .= 0; u_begin[:,end] .=0
 	drift,diff = drift!,noise!
-    t0=tmax;
     p=(dx,σ,N)
     u0 = rand(N,N)
 	du0 = copy(u0)
@@ -58,10 +59,13 @@ function generate_solution(σ,h,nt)
 	SDE_sparse = SDEFunction(drift,diff;jac_prototype=float.(jac_sparsity))
 	#t0=tmax;
 	#ϵ = 32dx
-	time_range = (0.0,tmax+dt) # fixa detta
-    t_idxs = 2^11*dt:dt:0.4
+    xmid = nx ÷ 2
+    eps = 4
+    x_idxs= CartesianIndices((xmid-eps:xmid+eps,xmid-eps:xmid+eps))
+	@show time_range = (t0,tmax+dt) # fixa detta
+    t_idxs = 0.1:2*dt:0.3
     E=SDEProblem(SDE_sparse,u_begin,time_range,p)
-    solution=solve(E,dtmax=dt,progress=true,algo,maxiters=1e7,save_everystep = false)
+    solution=solve(E,dtmax=dt,progress=true,algo,maxiters=1e7,saveat=t_idxs,dt=dt)
     return solution
 end
 
@@ -122,22 +126,23 @@ function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
     new_sol = @view solution[x_idx,y_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
     new_dx = x_quot*dx
     new_dt = t_quot*dt  
-    Lu=L_op(new_sol,new_dt,new_dx) .* 1/eps .* new_dx^2 .* new_dt
+    Lu=L_op(new_sol,new_dt,new_dx) .* 1/eps^2 .* new_dx^2 .* new_dt
     x_len,y_len,t_len = size(Lu)
     	    
 	    #time_startup = 2^15 ÷ t_quot
     max_x_points = (x_len)-x_eps-1 -(x_eps+1)
-    num_x_samples = min(20,max_x_points)
+    num_x_samples = min(2,max_x_points) # 20 usually
     total_samples = min(50000,t_len*num_x_samples)
     factor = t_len*num_x_samples/total_samples |> x-> ceil(Int,x)
     results = Channel{Tuple}(Inf)
 	Threads.@threads for t in 1:factor:t_len-t_eps-10
+        #plotln(t)
 		rand_x = sample(x_eps+2:x_len-x_eps-2,num_x_samples,replace=false)
 		rand_y = sample(x_eps+2:x_len-x_eps-2,num_x_samples,replace=false)
 		for i in 1:num_x_samples
 			x=rand_x[i]
 			y=rand_y[i]
-			integrated_view = view(Lu, x:x+x_eps+1,y:y+y_eps, t:t+t_eps)
+			integrated_view = view(Lu, x:x+x_eps,y:y+y_eps, t:t+t_eps)
 			l1,l2,l3 = size(integrated_view)
 			integrated=trapz((1:l1,1:l2,1:l3),integrated_view)^2
 			u=new_sol[x,y,t]
@@ -148,6 +153,35 @@ function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
 	collected_results = collect(results)
     df = DataFrame(:x=>first.(collected_results),:y=>last.(collected_results))
     return df
+end
+
+function partial_new(sol,dt,dx,eps)
+    nx,ny,nt = size(sol)
+    #Lu = similar(sol)
+    @show t_eps = (dx ÷ dt)*eps |> Int
+    sol_array = @view sol[:,:,:]
+    Lu=L_op(sol_array,dt,dx)
+    df = DataFrame(:x=>Float64[],:y=>Float64[])
+    #c = dt*dx^2
+    mid = nx ÷ 4
+    @inbounds for t in 2:nt-1
+        x_idxs,y_idxs = (mid,mid)
+        integrate_view = @view Lu[x_idxs:x_idxs+eps,y_idxs:y_idxs+eps,t:t+t_eps]
+        l1,l2,l3 = size(integrate_view)
+        x_range=dx:dx:l1*dx 
+        y_range=dx:dx:l2*dx 
+        t_range=dt:dt:l3*dt
+        #t_range=(0,l3*dt)
+        if eps > 0
+            integ = trapz((x_range,y_range,t_range),integrate_view) * (1/dx)^2
+        else
+            integ = integrate_view[1] * dt
+        end
+        integ = integ^2
+        u=sol[x_idxs,y_idxs,t]
+        push!(df,(u,integ))
+    end
+    return df 
 end
 
 function drift!(du,u,p,t)
@@ -179,7 +213,7 @@ function noise!(du,u,p,t)
     #        du[i,j] = σ(u[i,j])*sqrt(1/dx^2)
     #   end
     #end
-    du .= σ.(u) .* sqrt(1/dx)
+    du .= σ.(u) .* sqrt(1/dx^2)
 end
 
 function train_tuned(df)
@@ -205,7 +239,7 @@ function train_tuned(df)
 end
 
 function gpu_generation(σ,h,nt)
-    algo = SRIW1()#ImplicitRKMil(linsolve = KLUFactorization())
+    algo = SROCK1()#ImplicitRKMil(linsolve = KLUFactorization())
     L=1; 
 	tmax = 1.;
 	#h=2^6
@@ -223,13 +257,13 @@ function gpu_generation(σ,h,nt)
     u0 = rand(N,N)
 	du0 = copy(u0)
     jac_sparsity = Symbolics.jacobian_sparsity((du,u) -> drift!(du,u,p,0.0),du0,u0)
-    u_begin = cu(u_begin)
+    #u_begin = cu(u_begin)
 	SDE_sparse = SDEFunction(drift,diff;jac_prototype=float.(jac_sparsity))
 	time_range = (0.0,tmax+dt) # fixa detta
-    t_idxs = 2^11*dt:dt:0.4
+    t_idxs = 0.3:dt:0.4
     E=SDEProblem(SDE_sparse,u_begin,time_range,p)
-    solution=solve(E,dtmax=dt,saveat=t_idxs,progress=true,algo,maxiters=1e7)
-    return E
+    solution=solve(E,dtmax=dt,saveat=t_idxs,progress=true,algo,maxiters=1e7,dt=dt)
+    return solution
 end
 
 
