@@ -48,7 +48,7 @@ function generate_solution(σ,h,nt)
 	dx = L/(nx-1); 
 	dt = tmax/(nt-1); 
     max_ϵ = 32dx
-	u_begin = 6*ones(nx,nx)
+	u_begin = 12*ones(nx,nx)
 	u_begin[1,:] .= 0; u_begin[end,:] .= 0; u_begin[:,1] .= 0; u_begin[:,end] .=0
 	drift,diff = drift!,noise!
     p=(dx,σ,N)
@@ -126,12 +126,12 @@ function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
     new_sol = @view solution[x_idx,y_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
     new_dx = x_quot*dx
     new_dt = t_quot*dt  
-    Lu=L_op(new_sol,new_dt,new_dx) .* 1/eps^2 .* new_dx^2 .* new_dt
+    Lu=L_op(new_sol,new_dt,new_dx) .* 1/eps .* new_dx^2 .* new_dt
     x_len,y_len,t_len = size(Lu)
     	    
 	    #time_startup = 2^15 ÷ t_quot
     max_x_points = (x_len)-x_eps-1 -(x_eps+1)
-    num_x_samples = min(2,max_x_points) # 20 usually
+    num_x_samples = min(20,max_x_points-6) # 20 usually
     total_samples = min(50000,t_len*num_x_samples)
     factor = t_len*num_x_samples/total_samples |> x-> ceil(Int,x)
     results = Channel{Tuple}(Inf)
@@ -229,7 +229,7 @@ function train_tuned(df)
 	NearestNeighborModels.DualD(),NearestNeighborModels.DualU()])
 	knn_tuned = TunedModel(model=knn,
 	resampling=CV(nfolds=5),
-	tuning=Grid(goal=6),
+	tuning=Grid(goal=12),
 	range=[knn_r1,knn_r2],measure=rms,
 	acceleration=CPUThreads(),
 	acceleration_resampling=CPUThreads());

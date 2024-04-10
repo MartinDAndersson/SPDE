@@ -77,25 +77,25 @@ end
 
 # this function takes a full solution and rescales dx and dt by x_quot and t_quot,
 # it then does the estimation with epsilon = eps
-function partial_integration(solution,dt,dx,L,tmax,x_quot,t_quot,eps)
+function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
     nx,nt = size(solution)
     #df = DataFrame(:x=>Float64[],:y => Float64[])
-    new_nx = nx ÷ x_quot
-    new_nt = nt ÷ t_quot
+    #new_nx = nx ÷ x_quot
+    #new_nt = nt ÷ t_quot
     new_dx = x_quot*dx
     new_dt = t_quot*dt
-    x_eps = (eps ÷ new_dx) |> Int
-    t_eps = (eps ÷ new_dt) |> Int
+    @show x_eps = (eps ÷ new_dx) |> Int
+    @show t_eps = (eps ÷ new_dt) |> Int
     x_idx = 1:x_quot:nx#[i for i in 1:new_nx]*x_quot
     t_idx = 1:t_quot:nt#[t for t in 1:new_nt]*t_quot
-    new_sol = solution[x_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
+    new_sol = @view solution[x_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
     new_dx = x_quot*dx
     new_dt = t_quot*dt
-    Lu = L_op(new_sol,new_dt,new_dx) #.* sqrt(dx*dt) 
+    Lu = L_op(new_sol,new_dt,new_dx) .* 1/eps .* new_dx .* new_dt #.* sqrt(dx*dt) 
     #Lu = Lu * 1/sqrt(eps) * new_dx # no time
-    Lu .= Lu * 1/eps * new_dx * new_dt # with time
+    #Lu .= Lu * 1/eps * new_dx * new_dt # with time
     buffer = 1#2^13 ÷ t_quot
-    x_len,t_len = size(Lu_clean)
+    x_len,t_len = size(Lu)
     #time_startup = 2^15 ÷ t_quot
     max_x_points = (x_len)-x_eps-1 -(x_eps+1)
     num_x_samples = min(20,max_x_points)
@@ -192,10 +192,11 @@ function main_exp(spde_params)
 	samples = 1;
     #solution = generate_solution(σ)
     #println(size(solution))
+    sol = @view(solution[:,:])
     df = DataFrame(:x=>Float64[],:y=>Float64[])
     while size(df,1) < 20000
         solution = generate_solution(σ)
-        df_partial=SPDE.partial_integration(Matrix(solution),dt,dx,L,tmax,xquot,tquot,epsilon*dx)
+        df_partial=SPDE.partial_integration(sol,dt,dx,xquot,tquot,epsilon*dx)
         df = vcat(df,df_partial)
     end
     max_size_df = min(50000,size(df,1))
@@ -212,14 +213,61 @@ function main_exp(spde_params)
     return mach,fulld,truth,df
 end
 
+
+function paper_exp(solution,spde_params,σ)
+    @unpack xquot, tquot, epsilon, sigma = spde_params
+    #σ(x) = sin(x)
+    L=1; 
+    tmax = 0.3;
+    h=2^10
+    nx = h;
+    nt= 2^20
+    dx = L/(nx-1); 
+    dt = tmax/(nt-1); 
+    df = DataFrame(:x=>Float64[],:y=>Float64[])
+    sol = @view(solution[:,:])
+    df_partial=SPDE.partial_integration(sol,dt,dx,xquot,tquot,epsilon)
+    df = vcat(df,df_partial)
+    #σ(x) = sin(x)
+    while size(df,1) < 20000
+        solution = generate_solution(σ)
+        sol = @view(solution[:,:])
+        df_partial=SPDE.partial_integration(sol,dt,dx,xquot,tquot,epsilon)
+        df = vcat(df,df_partial)
+    end
+    max_size_df = min(50000,size(df,1))
+    rand_rows = sample(1:size(df,1),max_size_df,replace=false)
+    df=df[rand_rows,:]
+    mach = train_tuned(df)
+    lower_bound = quantile(df.x, 0.05)
+	upper_bound = quantile(df.x, 0.95)
+	# Filter the array to keep only the middle 90%
+	filtered_data = filter(x -> x >= lower_bound && x <= upper_bound, df.x)
+	umax = maximum(filtered_data)
+	umin = minimum(filtered_data)
+    truth(x) = σ(x)^2
+    N=10000
+    domain=(umin,umax)
+    l1,l2 = get_all_losses(mach,truth,domain,N)
+    println(l1,l2)
+    fulld = copy(spde_params)
+    fulld["l1"] = l1
+    fulld["l2"] = l2
+    fulld["lb"] = umin
+    fulld["ub"] = umax
+    return mach,fulld
+end
+
+
 function generate_solution(σ)
     #algo = ImplicitEM(linsolve = KLUFactorization())
-    algo=SRIW1()
+    #algo=SRIW1()
+    algo = SROCK1()
     L=1; 
 	tmax = 0.3;
-	h=2^9
+	h=2^10
 	nx = h;
-	nt= 2^18
+	nt= 2^20
 	dx = L/(nx-1); 
 	dt = tmax/(nt-1); 
     max_ϵ = 32dx
@@ -231,13 +279,15 @@ function generate_solution(σ)
 	#t0=tmax;
 	#ϵ = 32dx
 	time_range = ((0.0,t0+max_ϵ+dt)) # fixa detta
-    t_idxs = 2^14*dt:dt:tmax
+    #t_idxs = 0.05:dt:tmax
+    t_idxs = range(0.05,tmax,length=nt)
     p=(dx,σ)
+    #x_idxs = 1:2:
     E=EnsembleProblem(SDEProblem(SDE_sparse,u_begin,time_range,p))
-    solution=solve(E,dtmax=dt,trajectories=1,saveat=t_idxs,progress=true,algo,maxiters=1e7)[1]
+    solution=solve(E,dtmax=dt,dt=dt,trajectories=1,saveat=t_idxs,progress=true,algo,maxiters=1e7)[1]
     return solution
 end
-
+# Trains a tuned model
 function train_tuned(df)
 	df_filtered = filter(row -> row.x < 15, df)
 	#df_train,df_test = partition(df_filtered  ,0.8,rng=123)
