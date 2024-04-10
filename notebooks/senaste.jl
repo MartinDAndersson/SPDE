@@ -14,9 +14,6 @@ macro bind(def, element)
     end
 end
 
-# ╔═╡ f612d560-9988-4d3b-a605-8d145d7f434e
-using DrWatson
-
 # ╔═╡ 6c541e1a-dd2f-11ee-1948-03057f232327
 begin
 	@quickactivate "SPDE"
@@ -35,6 +32,9 @@ begin
 	using SPDE
 	using MLJ
 end
+
+# ╔═╡ f612d560-9988-4d3b-a605-8d145d7f434e
+using DrWatson
 
 # ╔═╡ a0576e78-e142-4fb6-9b96-c9edc91d1707
 using AlgebraOfGraphics, CairoMakie
@@ -393,6 +393,9 @@ begin
 	end
 end
 
+# ╔═╡ 5780c975-f31f-4fef-af56-aecc4cd5d806
+downsample_matrix(mat,x_quott,t_quott)
+
 # ╔═╡ baa72362-db61-4a1a-828c-ba6cb53fe0c9
 begin
 	i=0
@@ -427,9 +430,6 @@ end
 
 # ╔═╡ 79a321aa-73e8-4b4d-8a42-90a38cfeb2a3
 abs.(Lu) .|> log
-
-# ╔═╡ 5780c975-f31f-4fef-af56-aecc4cd5d806
-downsample_matrix(mat,x_quott,t_quott)
 
 # ╔═╡ f3c43976-8d53-40a8-a3b0-96233e92d758
 size(Lu)
