@@ -91,7 +91,7 @@ function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
     new_sol = @view solution[x_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
     new_dx = x_quot*dx
     new_dt = t_quot*dt
-    Lu = L_op(new_sol,new_dt,new_dx) .* 1/eps .* new_dx .* new_dt #.* sqrt(dx*dt) 
+    Lu = L_op(new_sol,new_dt,new_dx) .* 1/(sqrt(2)*eps) #.* new_dx .* new_dt #.* sqrt(dx*dt) 
     #Lu = Lu * 1/sqrt(eps) * new_dx # no time
     #Lu .= Lu * 1/eps * new_dx * new_dt # with time
     buffer = 1#2^13 ÷ t_quot
@@ -107,9 +107,11 @@ function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
         for i in 1:num_x_samples
             #x = rand(x_eps+1:x_len-x_eps-1)
             x=rand_x[i]
-            integrated_view = view(Lu, x:x+x_eps, t:t+t_eps) # right now not shifted to -1 to compensate
+            integrated_view = view(Lu, x-x_eps:x+x_eps, t:t+t_eps) # right now not shifted to -1 to compensate
             l1,l2 = size(integrated_view)
-            integrated=trapz((1:l1,1:l2),integrated_view)^2
+            rx = range(0,new_dx*(l1-1),length=l1)
+            rt = range(0,new_dt*(l2-1),length=l2)
+            integrated=trapz((rx,rt),integrated_view)^2
            #integrated = sum(integrated_view)^2
             #plotln(integrtated)
             #integrated = sum(Lu[x:x+x_eps-1,t:t+t_eps-1]).^2  # with time
