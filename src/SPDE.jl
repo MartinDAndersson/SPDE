@@ -13,6 +13,8 @@ using NearestNeighborModels
 using ProgressMeter
 using Trapz
 KNN = MLJ.@load KNNRegressor
+NeuralNetworkRegressor = MLJ.@load NeuralNetworkRegressor pkg=MLJFlux
+RandomForestRegressor = MLJ.@load RandomForestRegressor pkg=DecisionTree
 #using PyCall
 #const KNeighborsRegressor = PyNULL()
 #function __init__()
@@ -101,26 +103,26 @@ function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
     x_idx = 1:x_quot:nx#[i for i in 1:new_nx]*x_quot
     t_idx = 1:t_quot:nt#[t for t in 1:new_nt]*t_quot
     new_sol = @view solution[:,:] #[x_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
-    Lu = L_op(new_sol,new_dt,new_dx,x_quot,t_quot) .* 1/(sqrt(2)*eps) .* dx .* dt #.* new_dx .* new_dt #.* sqrt(dx*dt) 
+    Lu = L_op(new_sol,new_dt,new_dx) .* 1/(sqrt(2)*eps)   #.* dx .* dt #.* new_dx .* new_dt #.* sqrt(dx*dt) 
     buffer = 1#2^13 ÷ t_quot
     x_len,t_len = size(Lu)
     #time_startup = 2^15 ÷ t_quot
     max_x_points = (x_len)-x_eps-1 -(x_eps+1)
-    num_x_samples = min(20,max_x_points)
+    num_x_samples = min(10,max_x_points)
     total_samples = min(50000,t_len*num_x_samples)
-    factor = t_len*num_x_samples/total_samples |> x-> ceil(Int,x)
+    @show factor = t_len*num_x_samples/total_samples |> x-> ceil(Int,x)
     results = Channel{Tuple}(Inf)
     Threads.@threads for t in 1:factor:t_len-t_eps-10
         rand_x = sample(x_eps+32:x_len-x_eps-32,num_x_samples,replace=false) #+ -2
         for i in 1:num_x_samples
             #x = rand(x_eps+1:x_len-x_eps-1)
             x=rand_x[i]
-            integrated_view = view(Lu, x-x_eps:x+x_eps-1, t:t+t_eps-1) # right now not shifted to -1 to compensate
+            integrated_view = view(Lu, x-x_eps:x+x_eps, t:t+t_eps) # right now not shifted to -1 to compensate
             l1,l2 = size(integrated_view)
             rx = range(0,dx*(l1-1),length=l1)
             rt = range(0,dt*(l2-1),length=l2)
-            #integrated=trapz((rx,rt),integrated_view)^2
-            integrated = sum(integrated_view)^2 
+            integrated=trapz((rx,rt),integrated_view)^2
+            #integrated = sum(integrated_view)^2
             #plotln(integrtated)
             #integrated = sum(Lu[x:x+x_eps-1,t:t+t_eps-1]).^2  # with time
             #integrated = sum(Lu[x:x+x_eps-1,t]).^2 .* new_dt
@@ -269,16 +271,17 @@ function paper_exp(solution,spde_params,σ)
 end
 
 
-function generate_solution(σ)
-    algo = ImplicitEM(linsolve = KLUFactorization())
+function generate_solution(σ,nx,nt)
+    #algo = ImplicitEM(linsolve = KLUFactorization())
     #algo=SRIW1()
-    #algo = SROCK1()
+    algo = SROCK1()
+    algo=EM()
     L=1; 
-    buffert=0.05;
-	tmax = 0.3+buffert;
-	h=2^9
-	nx = h;
-	nt= 2^18
+    buffert=0.1;
+	tmax = 0.4+buffert;
+	#h=2^8
+	#nx = h;
+	#nt= 2^18
 	dx = L/(nx-1); 
 	dt = (tmax-buffert)/(nt-1); 
     max_ϵ = 32dx
@@ -290,17 +293,17 @@ function generate_solution(σ)
 	#t0=tmax;
 	#ϵ = 32dx
 	time_range = ((0.0,t0+max_ϵ+dt)) # fixa detta
-    t_idxs = buffert:dt:tmax+buffert
+    t_idxs = buffert:100*dt:tmax+buffert #changed dt here
     #t_idxs = #range(0.05,tmax,length=nt)
     p=(dx,σ)
     #x_idxs = 1:2:
     E=EnsembleProblem(SDEProblem(SDE_sparse,u_begin,time_range,p))
-    solution=solve(E,dtmax=dt,dt=dt,trajectories=1,saveat=t_idxs,progress=true,algo,maxiters=1e7)[1]
+    solution=solve(E,dtmax=dt,dt=dt,trajectories=100,saveat=t_idxs,progress=true,algo,maxiters=1e7,save_idxs=[2^i for i in 1:7])
     return solution
 end
 # Trains a tuned model
 function train_tuned(df)
-	df_filtered = filter(row -> row.x < 15, df)
+	df_filtered = df #filter(row -> row.y > 0.1, df)
 	#df_train,df_test = partition(df_filtered  ,0.8,rng=123)
 	x_data = select(df_filtered,1)
 	y_data = df_filtered.y #.* nx/t_quot
@@ -312,10 +315,12 @@ function train_tuned(df)
 	NearestNeighborModels.DualD(),NearestNeighborModels.DualU()])
 	knn_tuned = TunedModel(model=knn,
 	resampling=CV(nfolds=5),
-	tuning=Grid(goal=6),
-	range=[knn_r1,knn_r2],measure=rms,
+	tuning=Grid(goal=4),
+	range=[knn_r1,knn_r2],measure=LPLoss(;p=2),
 	acceleration=CPUThreads(),
 	acceleration_resampling=CPUThreads());
+    RF = RandomForestRegressor()
+    NNR=NeuralNetworkRegressor()
     mach = machine(knn_tuned,x_data,y_data)
     fit!(mach)
     return mach

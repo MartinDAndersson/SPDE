@@ -35,6 +35,9 @@ using Revise, gpu,highdim, MLJ,PlutoUI, SPDE
 # ╔═╡ e10997ad-16c3-4fdb-b449-17dc24a56e4c
 using CairoMakie, Makie, AlgebraOfGraphics
 
+# ╔═╡ fab50513-81e6-463f-8c5b-516db17ab5b4
+using Distributions
+
 # ╔═╡ eeb12461-fd30-4544-9e9e-82ed1f3859b5
 using DataFrames
 
@@ -43,6 +46,15 @@ using JLD2
 
 # ╔═╡ 07b9f4b4-76c7-43dd-8479-b107ed7abc4f
 using Glob
+
+# ╔═╡ 3f6e19b5-3aa3-4be8-8f5a-6e63b2219d00
+using DifferentialEquations.EnsembleAnalysis
+
+# ╔═╡ 52501b42-4601-4df5-be66-d7ebd56e7404
+using DifferentialEquations
+
+# ╔═╡ b6c46a6c-4c57-4bc7-8064-86051f152f60
+using Statistics
 
 # ╔═╡ 7ea44d8c-15f3-42c3-acea-36f0f2c1bc71
 using Trapz
@@ -78,7 +90,7 @@ Dict("sigma1"=>x->0.5x,"sigma2"=>x->sin(x),"sigma3"=>x->sin(2x),"sigma4"=>x->0.5
 # ╔═╡ db7d37fe-ea55-4a00-a559-e080414e6f40
 begin
 	sigma = "sigma2"
-	σ(x) = sin(x)
+	σ(x) = 1.
 	truth(x) = σ(x)^2
 	#samples=1
 end
@@ -88,7 +100,7 @@ begin
 	L=1 # right boundary of space
 	tmax = 0.3;
 	#σ = x-> 0.5*sin(2pi*x/6)
-	h=2^9
+	h=2^8
 	nx = h;
 	nt= 2^18
 	dx = L/(nx-1); 
@@ -312,7 +324,7 @@ end=#
 
 # ╔═╡ 2d35be40-2e54-4b67-9c2a-bc7ac632bcc5
 begin
-	new_sol = SPDE.generate_solution(σ)
+	new_sol = SPDE.generate_solution(σ,nx,nt)
 end
 
 # ╔═╡ ab0d3e13-7256-402e-b344-98ea9948880b
@@ -321,21 +333,25 @@ SPDE.L_op(Array(new_sol),dx,dt,1,1)
 # ╔═╡ 6cc4139d-1b2e-44c9-9bdb-db981c211730
 new_sol.t[2]-new_sol.t[1]
 
+# ╔═╡ 122712f6-61f2-4288-8194-e56d33298059
+sum=EnsembleSummary(new_sol)
+
 # ╔═╡ a928ccfd-74d7-4b4b-9617-707b736bb0e1
-df=SPDE.partial_integration(new_sol,dt,dx,2,4,2*dx)
-
-# ╔═╡ 1eeb7980-80f5-4149-b371-fe3ebce1b6df
-
-
-# ╔═╡ eb3998f2-2374-4dca-859a-c6b3e2b8faaa
 begin
-	dw = 0.1
-	int=[(i*dw)^2 for i in 0:10,t in 0:10]
-	lx,lt = size(int)
-	rx = range(0,dw*(lx-1),length=lx)
-	rt = range(0,dw*(lt-1),length=lt)
-	trapz((rx,rt),int)
+	#df=SPDE.partial_integration(new_sol,dt,dx,1,1,4dx)
 end
+
+# ╔═╡ 61020487-999d-4af7-b3f5-8fb6ef5258b7
+Plots.plot(sum,idxs=[100])
+
+# ╔═╡ e7e4d71e-45f0-4d6c-a973-5e46916ce52c
+Array(new_sol)[5,1000,:]
+
+# ╔═╡ 99a423ca-5966-48c0-8828-93368e983ed0
+
+
+# ╔═╡ d5378cc9-382a-45ba-aabb-0d6c5269c71a
+new_sol[1].t[end]
 
 # ╔═╡ 84ad3671-4d5c-48e0-a459-1cf6414051e6
 mach=SPDE.train_tuned(df)
@@ -343,26 +359,92 @@ mach=SPDE.train_tuned(df)
 # ╔═╡ 7da60210-a0b9-4556-95e7-86e429c0a3de
 train_func = SPDE.mach_to_func(mach)
 
-# ╔═╡ c5839c60-9886-4daa-bc00-83e0409f16cd
-?Channel
+# ╔═╡ 7150257c-5bb1-4695-8dd6-829fc7557732
+mean(df.y)
+
+# ╔═╡ a1672a38-9a19-4dec-9b5b-38f053c24382
+sqrt(2*4*dt*dx)
 
 # ╔═╡ 26317fb6-4c61-4ae2-83c8-de8383d463ce
 new_sol.t |> length
 
+# ╔═╡ de7ba506-26c8-4c55-8806-66c168ecd0a9
+1/(dx*dt) |> sqrt
+
 # ╔═╡ 1dd0676f-0e1b-415a-8209-9b6b34e304b6
 begin
-	Plots.plot(x->train_func(x),xlims=(0,6),ylims=(0,1))
+	Plots.plot(x->train_func(x),xlims=(0,6))
 	Plots.plot!(truth)
 end
 
-# ╔═╡ e392b03c-835d-425c-b777-d3d31184e089
+# ╔═╡ c115fdc0-3940-470a-ba3e-b0d8d70583b6
+new_sol.t[2]-new_sol.t[1]
 
+# ╔═╡ e8314029-ac3a-4a73-b29d-e033f47f2886
+
+
+# ╔═╡ e392b03c-835d-425c-b777-d3d31184e089
+dt
 
 # ╔═╡ 123fe936-9fb2-4084-94b5-29323e2fbace
-plot(df.x,df.y,alpha=0.4)
+plot(df.x,df.y,alpha=0.02)
+
+# ╔═╡ 90e9b13d-5172-4b8d-91c1-0f2848d1b1e0
+X=SPDE.L_op(Array(new_sol),2*dt,1*dx,1,2)  
+
+# ╔═╡ f4c87141-8029-4b38-b761-c4a8b9c1c0ba
+heatmap(X[:,end-1000:end])
+
+# ╔═╡ 917de72d-7592-41e9-a3ec-304161d6c629
+dx
+
+# ╔═╡ 523f9965-8533-4a76-9a38-97e8ba55e084
+
+
+# ╔═╡ 4dcfed74-9fb3-4fbf-991f-777026a8bda2
+(rand(X[2:end-1,2:end-2][:],10000) .* dt .* 1/dx) |> var
+
+# ╔═╡ d602790f-f9bb-4388-b1e5-094127ca4eb0
+scatter(X[128,end-10000:end].^2 .* dt,alpha=0.1)
+
+# ╔═╡ 4ba1dc45-984c-465f-a592-890a68dd99f2
+begin
+	lower_bound = quantile(df.x, 0.05)
+	upper_bound = quantile(df.x, 0.95)
+	# Filter the array to keep only the middle 90%
+	filtered_data = filter(row -> lower_bound < row.x < upper_bound, df)
+	lower_bound = quantile(df.y, 0.4)
+	upper_bound = quantile(df.y, 0.99)
+	filtered_data =filter(row -> lower_bound < row.y , df)
+
+	#umax = maximum(filtered_data)
+	#umin = minimum(filtered_data)
+end
+
+# ╔═╡ 27e77ef4-7596-4d91-b5b5-86c1044a2b67
+plot(filtered_data.x,filtered_data.y,alpha=0.01)
+
+# ╔═╡ 43a4c5e5-140c-45ea-9b27-859f953aebb6
+lower_bound
+
+# ╔═╡ 9f4e342c-8973-4faa-81d8-16613cba858d
+fit(Normal,df.y)
+
+# ╔═╡ e3cd63e7-5b8d-4b37-b741-cb03806800e5
+begin
+	plt=Makie.density(df.y)
+	Makie.plot!(fit(Normal,df.y[end-1000:end]),color=:red)
+	plt
+end
+
+# ╔═╡ 36f74429-156f-4d68-85af-dfa8f90d9f1c
+scatter(df.x,df.y,alpha=0.01)
 
 # ╔═╡ c19bd304-4ee0-4eb5-82a7-966370de4b9b
-pattern = "*"*sigma*"*tquot=16_xquot=4.jld2"
+pattern = "*"*sigma*"*tquot=4_xquot=2.jld2"
+
+# ╔═╡ 453cd265-5617-4db4-b8fc-5a53f2d4fb59
+2^8
 
 # ╔═╡ ecea9239-4ead-4063-8c12-1ee2511c58cf
 ests=glob(pattern,datadir("fel/machines")) .|> machine .|> SPDE.mach_to_func
@@ -466,6 +548,7 @@ trapz((1:xs,1:ts),dt*dx*A)
 # ╠═4d45344c-a13d-476e-8470-f2be4ffb18e9
 # ╠═e10997ad-16c3-4fdb-b449-17dc24a56e4c
 # ╠═db632c71-51a7-4564-b30f-69a73f12cfea
+# ╠═fab50513-81e6-463f-8c5b-516db17ab5b4
 # ╠═eeb12461-fd30-4544-9e9e-82ed1f3859b5
 # ╠═2ada319a-ae31-485d-97b1-a47d26712799
 # ╠═249e4694-001d-4b42-af3b-cdf9c14a1f14
@@ -517,17 +600,40 @@ trapz((1:xs,1:ts),dt*dx*A)
 # ╠═cc0c9bc5-b047-4ce9-be65-ca4ea528fe7c
 # ╠═07b9f4b4-76c7-43dd-8479-b107ed7abc4f
 # ╠═2d35be40-2e54-4b67-9c2a-bc7ac632bcc5
+# ╠═3f6e19b5-3aa3-4be8-8f5a-6e63b2219d00
+# ╠═52501b42-4601-4df5-be66-d7ebd56e7404
+# ╠═122712f6-61f2-4288-8194-e56d33298059
 # ╠═a928ccfd-74d7-4b4b-9617-707b736bb0e1
-# ╠═1eeb7980-80f5-4149-b371-fe3ebce1b6df
-# ╠═eb3998f2-2374-4dca-859a-c6b3e2b8faaa
+# ╠═61020487-999d-4af7-b3f5-8fb6ef5258b7
+# ╠═e7e4d71e-45f0-4d6c-a973-5e46916ce52c
+# ╠═99a423ca-5966-48c0-8828-93368e983ed0
+# ╠═d5378cc9-382a-45ba-aabb-0d6c5269c71a
 # ╠═84ad3671-4d5c-48e0-a459-1cf6414051e6
 # ╠═7da60210-a0b9-4556-95e7-86e429c0a3de
-# ╠═c5839c60-9886-4daa-bc00-83e0409f16cd
+# ╠═7150257c-5bb1-4695-8dd6-829fc7557732
+# ╠═a1672a38-9a19-4dec-9b5b-38f053c24382
 # ╠═26317fb6-4c61-4ae2-83c8-de8383d463ce
+# ╠═de7ba506-26c8-4c55-8806-66c168ecd0a9
 # ╠═1dd0676f-0e1b-415a-8209-9b6b34e304b6
+# ╠═c115fdc0-3940-470a-ba3e-b0d8d70583b6
+# ╠═e8314029-ac3a-4a73-b29d-e033f47f2886
 # ╠═e392b03c-835d-425c-b777-d3d31184e089
 # ╠═123fe936-9fb2-4084-94b5-29323e2fbace
+# ╠═90e9b13d-5172-4b8d-91c1-0f2848d1b1e0
+# ╠═f4c87141-8029-4b38-b761-c4a8b9c1c0ba
+# ╠═917de72d-7592-41e9-a3ec-304161d6c629
+# ╠═523f9965-8533-4a76-9a38-97e8ba55e084
+# ╠═4dcfed74-9fb3-4fbf-991f-777026a8bda2
+# ╠═d602790f-f9bb-4388-b1e5-094127ca4eb0
+# ╠═b6c46a6c-4c57-4bc7-8064-86051f152f60
+# ╠═4ba1dc45-984c-465f-a592-890a68dd99f2
+# ╠═27e77ef4-7596-4d91-b5b5-86c1044a2b67
+# ╠═43a4c5e5-140c-45ea-9b27-859f953aebb6
+# ╠═9f4e342c-8973-4faa-81d8-16613cba858d
+# ╠═e3cd63e7-5b8d-4b37-b741-cb03806800e5
+# ╠═36f74429-156f-4d68-85af-dfa8f90d9f1c
 # ╠═c19bd304-4ee0-4eb5-82a7-966370de4b9b
+# ╠═453cd265-5617-4db4-b8fc-5a53f2d4fb59
 # ╠═ecea9239-4ead-4063-8c12-1ee2511c58cf
 # ╠═0837cb26-3a68-47b0-b5b8-70daae283d04
 # ╠═f22ed1bd-1ea9-4280-8bbf-dbf1c6f3d90b
