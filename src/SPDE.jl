@@ -33,6 +33,21 @@ function L_op(u,dt,dx)
     return Lu
 end
 
+function L_op(u,dt,dx,xdiff,tdiff)
+    #u=BigFloat.(u)
+    #u = permutedims(u,(2,1))
+    Lu = similar(u)
+    nnx,nnt = size(u)
+    @inbounds for t in 1:nnt-1-tdiff
+        @inbounds for x in 2+xdiff:nnx-1-xdiff
+            t_d = 1/dt*(u[x,t+tdiff]-u[x,t])
+            x_d = (1/dx^2)*(u[x-xdiff,t]-2*u[x,t]+u[x+xdiff,t]) 
+            Lu[x,t] = t_d - 1/2 .* x_d
+        end
+    end
+    return Lu
+end
+
 function downsample_matrix(matrix, fx, fy)
     # Downsample a matrix by averaging over fx by fy blocks
     Nx, Ny = size(matrix)
@@ -68,8 +83,8 @@ function get_drift_diffusion()
 			du[i] = σ(u[i])*sqrt(1/dx)
 		end
 		@inbounds begin
-		du[1] = 0
-		du[end] = 0
+            du[1] = 0
+            du[end] = 0
 		end
 	end
 	return heat_drift!,heat_diffusion_noise!
@@ -79,21 +94,14 @@ end
 # it then does the estimation with epsilon = eps
 function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
     nx,nt = size(solution)
-    #df = DataFrame(:x=>Float64[],:y => Float64[])
-    #new_nx = nx ÷ x_quot
-    #new_nt = nt ÷ t_quot
     new_dx = x_quot*dx
     new_dt = t_quot*dt
-    @show x_eps = (eps ÷ new_dx) |> Int
-    @show t_eps = (eps ÷ new_dt) |> Int
+    @show x_eps = (eps ÷ dx) |> Int # new_dx otherwise
+    @show t_eps = (eps ÷ dt) |> Int# new_dt otherwise
     x_idx = 1:x_quot:nx#[i for i in 1:new_nx]*x_quot
     t_idx = 1:t_quot:nt#[t for t in 1:new_nt]*t_quot
-    new_sol = @view solution[x_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
-    new_dx = x_quot*dx
-    new_dt = t_quot*dt
-    Lu = L_op(new_sol,new_dt,new_dx) .* 1/(sqrt(2)*eps) #.* new_dx .* new_dt #.* sqrt(dx*dt) 
-    #Lu = Lu * 1/sqrt(eps) * new_dx # no time
-    #Lu .= Lu * 1/eps * new_dx * new_dt # with time
+    new_sol = @view solution[:,:] #[x_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
+    Lu = L_op(new_sol,new_dt,new_dx,x_quot,t_quot) .* 1/(sqrt(2)*eps) .* dx .* dt #.* new_dx .* new_dt #.* sqrt(dx*dt) 
     buffer = 1#2^13 ÷ t_quot
     x_len,t_len = size(Lu)
     #time_startup = 2^15 ÷ t_quot
@@ -103,16 +111,16 @@ function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
     factor = t_len*num_x_samples/total_samples |> x-> ceil(Int,x)
     results = Channel{Tuple}(Inf)
     Threads.@threads for t in 1:factor:t_len-t_eps-10
-        rand_x = sample(x_eps+2:x_len-x_eps-2,num_x_samples,replace=false)
+        rand_x = sample(x_eps+32:x_len-x_eps-32,num_x_samples,replace=false) #+ -2
         for i in 1:num_x_samples
             #x = rand(x_eps+1:x_len-x_eps-1)
             x=rand_x[i]
-            integrated_view = view(Lu, x-x_eps:x+x_eps, t:t+t_eps) # right now not shifted to -1 to compensate
+            integrated_view = view(Lu, x-x_eps:x+x_eps-1, t:t+t_eps-1) # right now not shifted to -1 to compensate
             l1,l2 = size(integrated_view)
-            rx = range(0,new_dx*(l1-1),length=l1)
-            rt = range(0,new_dt*(l2-1),length=l2)
-            integrated=trapz((rx,rt),integrated_view)^2
-           #integrated = sum(integrated_view)^2
+            rx = range(0,dx*(l1-1),length=l1)
+            rt = range(0,dt*(l2-1),length=l2)
+            #integrated=trapz((rx,rt),integrated_view)^2
+            integrated = sum(integrated_view)^2 
             #plotln(integrtated)
             #integrated = sum(Lu[x:x+x_eps-1,t:t+t_eps-1]).^2  # with time
             #integrated = sum(Lu[x:x+x_eps-1,t]).^2 .* new_dt
@@ -221,9 +229,9 @@ function paper_exp(solution,spde_params,σ)
     #σ(x) = sin(x)
     L=1; 
     tmax = 0.3;
-    h=2^10
+    h=2^9
     nx = h;
-    nt= 2^20
+    nt= 2^18
     dx = L/(nx-1); 
     dt = tmax/(nt-1); 
     df = DataFrame(:x=>Float64[],:y=>Float64[])
@@ -262,16 +270,17 @@ end
 
 
 function generate_solution(σ)
-    #algo = ImplicitEM(linsolve = KLUFactorization())
+    algo = ImplicitEM(linsolve = KLUFactorization())
     #algo=SRIW1()
-    algo = SROCK1()
+    #algo = SROCK1()
     L=1; 
-	tmax = 0.3;
-	h=2^10
+    buffert=0.05;
+	tmax = 0.3+buffert;
+	h=2^9
 	nx = h;
-	nt= 2^20
+	nt= 2^18
 	dx = L/(nx-1); 
-	dt = tmax/(nt-1); 
+	dt = (tmax-buffert)/(nt-1); 
     max_ϵ = 32dx
 	u_begin = 2*pi*ones(nx); u_begin[1] = 0; u_begin[end] = 0;
 	drift,diff = SPDE.get_drift_diffusion()
@@ -281,8 +290,8 @@ function generate_solution(σ)
 	#t0=tmax;
 	#ϵ = 32dx
 	time_range = ((0.0,t0+max_ϵ+dt)) # fixa detta
-    #t_idxs = 0.05:dt:tmax
-    t_idxs = range(0.05,tmax,length=nt)
+    t_idxs = buffert:dt:tmax+buffert
+    #t_idxs = #range(0.05,tmax,length=nt)
     p=(dx,σ)
     #x_idxs = 1:2:
     E=EnsembleProblem(SDEProblem(SDE_sparse,u_begin,time_range,p))

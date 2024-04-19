@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.40
+# v0.19.41
 
 using Markdown
 using InteractiveUtils
@@ -12,6 +12,12 @@ macro bind(def, element)
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
         el
     end
+end
+
+# ╔═╡ 695bfa62-da5a-4f72-a975-edabb5aabfb0
+begin
+	using Pkg
+	Pkg.add("DrWatson")
 end
 
 # ╔═╡ c017450a-f5a7-11ee-0164-85395fdbfd76
@@ -77,8 +83,86 @@ begin
 	#samples=1
 end
 
+# ╔═╡ f1cf062f-2984-4273-9fa9-6b4374af30a0
+begin
+	L=1 # right boundary of space
+	tmax = 0.3;
+	#σ = x-> 0.5*sin(2pi*x/6)
+	h=2^9
+	nx = h;
+	nt= 2^18
+	dx = L/(nx-1); 
+	dt = tmax/(nt-1);
+	tmax = 0.3; 
+end
+
+# ╔═╡ a649f9d6-544a-4d36-ac6c-4b550c1b884c
+w = Dict("epsilon"=>[2^i*dx for i in 1:5],
+	"xquot" => 2^0,
+	"tquot"=>2^0,
+	"sigma" => sigma,
+	"dx"=>dx,
+	"dt"=>dt)
+
+# ╔═╡ 1395c711-b758-4980-840b-533e95d82973
+begin
+	param1 = Dict("epsilon"=>[i*dx for i in 11:30],
+	"xquot" => 2^0,
+	"tquot"=>2^0,
+	"sigma" => sigma,
+	"dx"=>dx,
+	"dt"=>dt)
+	param2 = Dict("epsilon"=>[i*dx for i in 6:1:20],
+	"xquot" => 2^1,
+	"tquot"=>2^2,
+	"sigma" => sigma,
+	"dx"=>dx,
+	"dt"=>dt)
+	param3 = Dict("epsilon"=>[i*dx for i in 20:1:40],
+	"xquot" => 2^2,
+	"tquot"=>2^4,
+	"sigma" => sigma,
+	"dx"=>dx,
+	"dt"=>dt)
+	param4 = Dict("epsilon"=>[2^i*dx for i in 0:6],
+	"xquot" => 2^3,
+	"tquot"=>2^6,
+	"sigma" => sigma,
+	"dx"=>dx,
+	"dt"=>dt)
+	param5 = Dict("epsilon"=>[2^i*dx for i in 4:6],
+	"xquot" => 2^4,
+	"tquot"=>2^8,
+	"sigma" => sigma,
+	"dx"=>dx,
+	"dt"=>dt)
+	param6 = Dict("epsilon"=>[2^i*dx for i in 5:6],
+	"xquot" => 2^5,
+	"tquot"=>2^10,
+	"sigma" => sigma,
+	"dx"=>dx,
+	"dt"=>dt)
+end
+
 # ╔═╡ e41727ff-363b-47c4-bb42-fcb38c2b750c
 2^7
+
+# ╔═╡ 7076d8a1-7eb2-4ed0-b86d-0bf851285c2c
+long_params = vcat(dict_list.([param1,param2,param3,param4,param5,param6])...)
+
+# ╔═╡ 69bd2991-dfb7-47c6-9ec3-0bfeb282321e
+#=for sample in 1:1
+	
+	sol = SPDE.generate_solution(σ)
+	for (i, d) in enumerate(dict_list(param1))
+	    mach,f = SPDE.paper_exp(sol,d,σ)
+		d["sample"] = sample
+		println(d)
+		wsave(datadir("fel/simulations", savename(d, "jld2")), f)
+		MLJ.save(datadir("fel/machines",savename(d,"jld2")),mach)
+	end
+end
+=#
 
 # ╔═╡ 24bd0085-8b15-4223-a588-edfcb0a6dc67
 function get_function(tquot, xquot, epsilon, sigma, machines_dict)
@@ -134,11 +218,17 @@ end
 # ╔═╡ 29f0d683-a9ac-447a-ba3f-0d0472d3dae5
  collect_results(datadir("simulations")) |> dropmissing!
 
-# ╔═╡ ab0d3e13-7256-402e-b344-98ea9948880b
-df_exp
+# ╔═╡ 70343c71-5584-425e-aa68-caaa44e3c7bb
+
 
 # ╔═╡ ed8e706e-f858-4be1-aec8-ded2d3c4953c
 eps_func(dx) = dx^(0.82)
+
+# ╔═╡ a1879e1a-4692-4b7c-94d5-9873e3973eb3
+eps_func(dx)
+
+# ╔═╡ 66868d75-7080-41a7-b89c-3a45b1783a52
+dx
 
 # ╔═╡ 4ff556cc-4351-4127-851d-62193ac73237
 data(df_exp)*mapping(:epsilon=>log,:l1=>log,color=:sigma,layout=:log_dx=>nonnumeric)*visual(Scatter) |> draw
@@ -163,90 +253,6 @@ std(min_l1_mean_df.log_eps ./ min_l1_mean_df.log_dx )
 
 # ╔═╡ f9e3271a-bce7-4115-8139-e05337e77141
 df_exp
-
-# ╔═╡ f1cf062f-2984-4273-9fa9-6b4374af30a0
-begin
-	L=1 # right boundary of space
-	tmax = 0.3;
-	#σ = x-> 0.5*sin(2pi*x/6)
-	h=2^10
-	nx = h;
-	nt= 2^20
-	dx = L/(nx-1); 
-	dt = tmax/(nt-1);
-	tmax = 0.3; 
-end
-
-# ╔═╡ a649f9d6-544a-4d36-ac6c-4b550c1b884c
-w = Dict("epsilon"=>[2^i*dx for i in 1:5],
-	"xquot" => 2^0,
-	"tquot"=>2^0,
-	"sigma" => sigma,
-	"dx"=>dx,
-	"dt"=>dt)
-
-# ╔═╡ 1395c711-b758-4980-840b-533e95d82973
-begin
-	param1 = Dict("epsilon"=>[2^i*dx for i in 1:5],
-	"xquot" => 2^0,
-	"tquot"=>2^0,
-	"sigma" => sigma,
-	"dx"=>dx,
-	"dt"=>dt)
-	param2 = Dict("epsilon"=>[2^i*dx for i in 1:6],
-	"xquot" => 2^1,
-	"tquot"=>2^2,
-	"sigma" => sigma,
-	"dx"=>dx,
-	"dt"=>dt)
-	param3 = Dict("epsilon"=>[2^i*dx for i in 2:7],
-	"xquot" => 2^2,
-	"tquot"=>2^4,
-	"sigma" => sigma,
-	"dx"=>dx,
-	"dt"=>dt)
-	param4 = Dict("epsilon"=>[2^i*dx for i in 3:7],
-	"xquot" => 2^3,
-	"tquot"=>2^6,
-	"sigma" => sigma,
-	"dx"=>dx,
-	"dt"=>dt)
-	param5 = Dict("epsilon"=>[2^i*dx for i in 4:7],
-	"xquot" => 2^4,
-	"tquot"=>2^8,
-	"sigma" => sigma,
-	"dx"=>dx,
-	"dt"=>dt)
-	param6 = Dict("epsilon"=>[2^i*dx for i in 5:7],
-	"xquot" => 2^5,
-	"tquot"=>2^10,
-	"sigma" => sigma,
-	"dx"=>dx,
-	"dt"=>dt)
-end
-
-# ╔═╡ 7076d8a1-7eb2-4ed0-b86d-0bf851285c2c
-long_params = vcat(dict_list.([param2,param3,param4,param5,param6])...)
-
-# ╔═╡ 69bd2991-dfb7-47c6-9ec3-0bfeb282321e
-for sample in 1:1
-	
-	sol = SPDE.generate_solution(σ)
-	for (i, d) in enumerate(long_params)
-	    mach,f = SPDE.paper_exp(sol,d,σ)
-		d["sample"] = sample
-		println(d)
-		wsave(datadir("simulations", savename(d, "jld2")), f)
-		MLJ.save(datadir("machines",savename(d,"jld2")),mach)
-	end
-end
-
-
-# ╔═╡ a1879e1a-4692-4b7c-94d5-9873e3973eb3
-eps_func(dx)
-
-# ╔═╡ 66868d75-7080-41a7-b89c-3a45b1783a52
-dx
 
 # ╔═╡ cbd67162-38d1-4e6e-8a2e-98a3195c5a90
 
@@ -304,11 +310,59 @@ end=#
 # ╔═╡ cc0c9bc5-b047-4ce9-be65-ca4ea528fe7c
 #funcs = machine.(paths) .|> SPDE.mach_to_func
 
-# ╔═╡ c19bd304-4ee0-4eb5-82a7-966370de4b9b
-pattern = "*"*sigma*"*tquot=4_xquot=2.jld2"
-
 # ╔═╡ 2d35be40-2e54-4b67-9c2a-bc7ac632bcc5
-glob
+begin
+	new_sol = SPDE.generate_solution(σ)
+end
+
+# ╔═╡ ab0d3e13-7256-402e-b344-98ea9948880b
+SPDE.L_op(Array(new_sol),dx,dt,1,1)
+
+# ╔═╡ 6cc4139d-1b2e-44c9-9bdb-db981c211730
+new_sol.t[2]-new_sol.t[1]
+
+# ╔═╡ a928ccfd-74d7-4b4b-9617-707b736bb0e1
+df=SPDE.partial_integration(new_sol,dt,dx,2,4,2*dx)
+
+# ╔═╡ 1eeb7980-80f5-4149-b371-fe3ebce1b6df
+
+
+# ╔═╡ eb3998f2-2374-4dca-859a-c6b3e2b8faaa
+begin
+	dw = 0.1
+	int=[(i*dw)^2 for i in 0:10,t in 0:10]
+	lx,lt = size(int)
+	rx = range(0,dw*(lx-1),length=lx)
+	rt = range(0,dw*(lt-1),length=lt)
+	trapz((rx,rt),int)
+end
+
+# ╔═╡ 84ad3671-4d5c-48e0-a459-1cf6414051e6
+mach=SPDE.train_tuned(df)
+
+# ╔═╡ 7da60210-a0b9-4556-95e7-86e429c0a3de
+train_func = SPDE.mach_to_func(mach)
+
+# ╔═╡ c5839c60-9886-4daa-bc00-83e0409f16cd
+?Channel
+
+# ╔═╡ 26317fb6-4c61-4ae2-83c8-de8383d463ce
+new_sol.t |> length
+
+# ╔═╡ 1dd0676f-0e1b-415a-8209-9b6b34e304b6
+begin
+	Plots.plot(x->train_func(x),xlims=(0,6),ylims=(0,1))
+	Plots.plot!(truth)
+end
+
+# ╔═╡ e392b03c-835d-425c-b777-d3d31184e089
+
+
+# ╔═╡ 123fe936-9fb2-4084-94b5-29323e2fbace
+plot(df.x,df.y,alpha=0.4)
+
+# ╔═╡ c19bd304-4ee0-4eb5-82a7-966370de4b9b
+pattern = "*"*sigma*"*tquot=16_xquot=4.jld2"
 
 # ╔═╡ ecea9239-4ead-4063-8c12-1ee2511c58cf
 ests=glob(pattern,datadir("fel/machines")) .|> machine .|> SPDE.mach_to_func
@@ -317,21 +371,26 @@ ests=glob(pattern,datadir("fel/machines")) .|> machine .|> SPDE.mach_to_func
 begin
 	plt2 = Plots.plot()
 	for est in ests
-		Plots.plot!(x->est(x),xlims=(0.5,6),label="",alpha=0.5)
+		Plots.plot!(x->est(x),xlims=(0.5,3),label="",alpha=0.5)
 	end
-	Plots.plot!(truth)
+	#Plots.plot!(truth)
 	plt2
-end
-
-# ╔═╡ 76b68049-4ee3-4b9c-aed1-30b7a183f09f
-begin
-	ee = 2*dx
-	aa = 2*dx
-	ee ÷ aa |> Int
 end
 
 # ╔═╡ f22ed1bd-1ea9-4280-8bbf-dbf1c6f3d90b
 mean_fun = (glob("*0.00782*"*sigma*"*",datadir("machines")) .|> machine .|> SPDE.mach_to_func)
+
+# ╔═╡ 7517cd1d-4733-4829-aaa6-3c8a2e20b8e8
+4*dx
+
+# ╔═╡ e54c6768-fcfc-411b-97a4-927bb8e00a2c
+A=rand(3,3)
+
+# ╔═╡ 18f971be-5a24-47ed-bced-b7370ec2da58
+range(0,2*3,length=100)
+
+# ╔═╡ 9020b6ac-f1b6-40d3-b105-7dd6a62847e0
+size(A)
 
 # ╔═╡ 5413c0f0-6648-4676-a105-0527cbf66ad2
 ests
@@ -339,13 +398,16 @@ ests
 # ╔═╡ fab69841-6fb5-4cc2-bd57-88da4aa1baf9
 paths = glob(pattern,datadir("fel/machines"))
 
+# ╔═╡ 23b26789-3d64-4165-8198-5513362495e7
+length(paths)
+
 # ╔═╡ b1c343e5-753b-415f-8aaf-217cab06b1de
 @bind idx PlutoUI.Slider(1:length(paths))
 
 # ╔═╡ 871f578e-0548-4ff0-a179-53de82b44412
 begin
 	Plots.plot(truth)
-	Plots.plot!(x->ests[idx](x),xlims=(0.5,6),label=paths[idx][end-55:end])
+	Plots.plot!(x->ests[idx](x),xlims=(0.,3.),label=paths[idx][end-55:end],ylims=(0,1))
 end
 
 # ╔═╡ 4adb7af1-0cd1-452a-a1d1-c434bb494e2e
@@ -370,7 +432,10 @@ glob(pattern,datadir("machines"))[idx]
 #SPDE.get_all_losses( machine.(paths)[1],truth,(0.5,5),1000)
 
 # ╔═╡ af4d8058-5fd3-4f91-ad9b-a8db7ffc3b44
+# ╠═╡ disabled = true
+#=╠═╡
 A = rand(10,10)
+  ╠═╡ =#
 
 # ╔═╡ f899052b-fffe-49df-9e74-11994b30083f
 xs,ts = size(A)
@@ -394,6 +459,7 @@ trapz((xran,yran),A)
 trapz((1:xs,1:ts),dt*dx*A)
 
 # ╔═╡ Cell order:
+# ╠═695bfa62-da5a-4f72-a975-edabb5aabfb0
 # ╠═c017450a-f5a7-11ee-0164-85395fdbfd76
 # ╠═81dd640f-e0b5-4ef8-871b-6e83e5458fe4
 # ╠═a9932afd-b2c3-4495-9918-5505b47eafa3
@@ -409,6 +475,7 @@ trapz((1:xs,1:ts),dt*dx*A)
 # ╠═29dd233d-01e0-4d15-88aa-e859201727a9
 # ╠═9dafd043-d524-4caa-8137-2e3855ba47de
 # ╠═db7d37fe-ea55-4a00-a559-e080414e6f40
+# ╠═f1cf062f-2984-4273-9fa9-6b4374af30a0
 # ╠═a649f9d6-544a-4d36-ac6c-4b550c1b884c
 # ╠═1395c711-b758-4980-840b-533e95d82973
 # ╠═e41727ff-363b-47c4-bb42-fcb38c2b750c
@@ -421,6 +488,8 @@ trapz((1:xs,1:ts),dt*dx*A)
 # ╠═a35d1717-e1c5-4826-a8ab-297cd10affd6
 # ╠═29f0d683-a9ac-447a-ba3f-0d0472d3dae5
 # ╠═ab0d3e13-7256-402e-b344-98ea9948880b
+# ╠═6cc4139d-1b2e-44c9-9bdb-db981c211730
+# ╠═70343c71-5584-425e-aa68-caaa44e3c7bb
 # ╠═ed8e706e-f858-4be1-aec8-ded2d3c4953c
 # ╠═a1879e1a-4692-4b7c-94d5-9873e3973eb3
 # ╠═66868d75-7080-41a7-b89c-3a45b1783a52
@@ -432,7 +501,6 @@ trapz((1:xs,1:ts),dt*dx*A)
 # ╠═eac0bc9e-310c-494c-be30-7431fc6edcc6
 # ╠═ab509f29-8a18-453b-9f74-5558c15f7148
 # ╠═f9e3271a-bce7-4115-8139-e05337e77141
-# ╠═f1cf062f-2984-4273-9fa9-6b4374af30a0
 # ╠═cbd67162-38d1-4e6e-8a2e-98a3195c5a90
 # ╠═b5d60059-398b-42d8-946e-7fd5aab10605
 # ╠═6b20b20d-caee-4923-9182-085fff1d11a7
@@ -448,16 +516,30 @@ trapz((1:xs,1:ts),dt*dx*A)
 # ╠═4c21673c-1551-4643-b148-c77075a22716
 # ╠═cc0c9bc5-b047-4ce9-be65-ca4ea528fe7c
 # ╠═07b9f4b4-76c7-43dd-8479-b107ed7abc4f
-# ╠═c19bd304-4ee0-4eb5-82a7-966370de4b9b
 # ╠═2d35be40-2e54-4b67-9c2a-bc7ac632bcc5
+# ╠═a928ccfd-74d7-4b4b-9617-707b736bb0e1
+# ╠═1eeb7980-80f5-4149-b371-fe3ebce1b6df
+# ╠═eb3998f2-2374-4dca-859a-c6b3e2b8faaa
+# ╠═84ad3671-4d5c-48e0-a459-1cf6414051e6
+# ╠═7da60210-a0b9-4556-95e7-86e429c0a3de
+# ╠═c5839c60-9886-4daa-bc00-83e0409f16cd
+# ╠═26317fb6-4c61-4ae2-83c8-de8383d463ce
+# ╠═1dd0676f-0e1b-415a-8209-9b6b34e304b6
+# ╠═e392b03c-835d-425c-b777-d3d31184e089
+# ╠═123fe936-9fb2-4084-94b5-29323e2fbace
+# ╠═c19bd304-4ee0-4eb5-82a7-966370de4b9b
 # ╠═ecea9239-4ead-4063-8c12-1ee2511c58cf
 # ╠═0837cb26-3a68-47b0-b5b8-70daae283d04
-# ╠═76b68049-4ee3-4b9c-aed1-30b7a183f09f
 # ╠═f22ed1bd-1ea9-4280-8bbf-dbf1c6f3d90b
 # ╠═871f578e-0548-4ff0-a179-53de82b44412
+# ╠═7517cd1d-4733-4829-aaa6-3c8a2e20b8e8
+# ╠═23b26789-3d64-4165-8198-5513362495e7
+# ╠═b1c343e5-753b-415f-8aaf-217cab06b1de
+# ╠═e54c6768-fcfc-411b-97a4-927bb8e00a2c
+# ╠═18f971be-5a24-47ed-bced-b7370ec2da58
+# ╠═9020b6ac-f1b6-40d3-b105-7dd6a62847e0
 # ╠═4adb7af1-0cd1-452a-a1d1-c434bb494e2e
 # ╠═1c760b9e-2b60-4ee0-a93d-d1eecb48f6bb
-# ╠═b1c343e5-753b-415f-8aaf-217cab06b1de
 # ╠═5413c0f0-6648-4676-a105-0527cbf66ad2
 # ╠═fab69841-6fb5-4cc2-bd57-88da4aa1baf9
 # ╠═1ce56563-5e96-4116-b69e-7373a960e98f
