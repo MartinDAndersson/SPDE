@@ -63,6 +63,7 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Trapz = "592b5752-818d-11e9-1e9a-2b8ca4a44cd1"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
+cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [compat]
 DrWatson = "2.14.1"

@@ -1,18 +1,23 @@
 ### A Pluto.jl notebook ###
-# v0.19.40
+# v0.20.5
 
 using Markdown
 using InteractiveUtils
 
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
-    quote
+    #! format: off
+    return quote
         local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
         local el = $(esc(element))
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
         el
     end
+    #! format: on
 end
+
+# ╔═╡ f612d560-9988-4d3b-a605-8d145d7f434e
+using DrWatson
 
 # ╔═╡ 6c541e1a-dd2f-11ee-1948-03057f232327
 begin
@@ -32,9 +37,6 @@ begin
 	using SPDE
 	using MLJ
 end
-
-# ╔═╡ f612d560-9988-4d3b-a605-8d145d7f434e
-using DrWatson
 
 # ╔═╡ a0576e78-e142-4fb6-9b96-c9edc91d1707
 using AlgebraOfGraphics, CairoMakie
@@ -393,9 +395,6 @@ begin
 	end
 end
 
-# ╔═╡ 5780c975-f31f-4fef-af56-aecc4cd5d806
-downsample_matrix(mat,x_quott,t_quott)
-
 # ╔═╡ baa72362-db61-4a1a-828c-ba6cb53fe0c9
 begin
 	i=0
@@ -430,6 +429,9 @@ end
 
 # ╔═╡ 79a321aa-73e8-4b4d-8a42-90a38cfeb2a3
 abs.(Lu) .|> log
+
+# ╔═╡ 5780c975-f31f-4fef-af56-aecc4cd5d806
+downsample_matrix(mat,x_quott,t_quott)
 
 # ╔═╡ f3c43976-8d53-40a8-a3b0-96233e92d758
 size(Lu)

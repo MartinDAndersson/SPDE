@@ -298,7 +298,7 @@ function generate_solution(σ,nx,nt)
     p=(dx,σ)
     #x_idxs = 1:2:
     E=EnsembleProblem(SDEProblem(SDE_sparse,u_begin,time_range,p))
-    solution=solve(E,dtmax=dt,dt=dt,trajectories=100,saveat=t_idxs,progress=true,algo,maxiters=1e7,save_idxs=[2^i for i in 1:7])
+    solution=solve(E,dtmax=dt,dt=dt,trajectories=10,saveat=t_idxs,progress=true,algo,maxiters=1e7)#,save_idxs=[2^i for i in 1:7])
     return solution
 end
 # Trains a tuned model

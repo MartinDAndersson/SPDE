@@ -1,17 +1,19 @@
 ### A Pluto.jl notebook ###
-# v0.19.41
+# v0.20.5
 
 using Markdown
 using InteractiveUtils
 
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
-    quote
+    #! format: off
+    return quote
         local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
         local el = $(esc(element))
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
         el
     end
+    #! format: on
 end
 
 # ╔═╡ 695bfa62-da5a-4f72-a975-edabb5aabfb0
@@ -163,7 +165,7 @@ end
 long_params = vcat(dict_list.([param1,param2,param3,param4,param5,param6])...)
 
 # ╔═╡ 69bd2991-dfb7-47c6-9ec3-0bfeb282321e
-#=for sample in 1:1
+for sample in 1:1
 	
 	sol = SPDE.generate_solution(σ)
 	for (i, d) in enumerate(dict_list(param1))
@@ -174,7 +176,7 @@ long_params = vcat(dict_list.([param1,param2,param3,param4,param5,param6])...)
 		MLJ.save(datadir("fel/machines",savename(d,"jld2")),mach)
 	end
 end
-=#
+
 
 # ╔═╡ 24bd0085-8b15-4223-a588-edfcb0a6dc67
 function get_function(tquot, xquot, epsilon, sigma, machines_dict)
@@ -230,7 +232,10 @@ end
 # ╔═╡ 29f0d683-a9ac-447a-ba3f-0d0472d3dae5
  collect_results(datadir("simulations")) |> dropmissing!
 
-# ╔═╡ 70343c71-5584-425e-aa68-caaa44e3c7bb
+# ╔═╡ ee056144-06f4-4c62-bbcb-697f2284b2fc
+
+
+# ╔═╡ b3d7186d-3957-4f0b-8812-ce5a7193289d
 
 
 # ╔═╡ ed8e706e-f858-4be1-aec8-ded2d3c4953c
@@ -238,9 +243,6 @@ eps_func(dx) = dx^(0.82)
 
 # ╔═╡ a1879e1a-4692-4b7c-94d5-9873e3973eb3
 eps_func(dx)
-
-# ╔═╡ 66868d75-7080-41a7-b89c-3a45b1783a52
-dx
 
 # ╔═╡ 4ff556cc-4351-4127-851d-62193ac73237
 data(df_exp)*mapping(:epsilon=>log,:l1=>log,color=:sigma,layout=:log_dx=>nonnumeric)*visual(Scatter) |> draw
@@ -273,7 +275,7 @@ df_exp
 #size(sol)
 
 # ╔═╡ 6b20b20d-caee-4923-9182-085fff1d11a7
-#df = SPDE.partial_integration(sol,dt,dx,2^5,2^10,128*dx)
+df = SPDE.partial_integration(sol,dt,dx,2^5,2^10,128*dx)
 
 # ╔═╡ bb0563be-a270-425d-95fd-4c530aafb01c
 
@@ -332,6 +334,9 @@ SPDE.L_op(Array(new_sol),dx,dt,1,1)
 
 # ╔═╡ 6cc4139d-1b2e-44c9-9bdb-db981c211730
 new_sol.t[2]-new_sol.t[1]
+
+# ╔═╡ 70343c71-5584-425e-aa68-caaa44e3c7bb
+new_sol[1]
 
 # ╔═╡ 122712f6-61f2-4288-8194-e56d33298059
 sum=EnsembleSummary(new_sol)
@@ -573,9 +578,10 @@ trapz((1:xs,1:ts),dt*dx*A)
 # ╠═ab0d3e13-7256-402e-b344-98ea9948880b
 # ╠═6cc4139d-1b2e-44c9-9bdb-db981c211730
 # ╠═70343c71-5584-425e-aa68-caaa44e3c7bb
+# ╠═ee056144-06f4-4c62-bbcb-697f2284b2fc
+# ╠═b3d7186d-3957-4f0b-8812-ce5a7193289d
 # ╠═ed8e706e-f858-4be1-aec8-ded2d3c4953c
 # ╠═a1879e1a-4692-4b7c-94d5-9873e3973eb3
-# ╠═66868d75-7080-41a7-b89c-3a45b1783a52
 # ╠═4ff556cc-4351-4127-851d-62193ac73237
 # ╠═306ee4e7-4bd0-4ec9-8ecd-affcd1679d5a
 # ╠═b1e45910-eda1-4128-a76c-3ee42b1560c2
