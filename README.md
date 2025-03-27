@@ -51,6 +51,12 @@ We consider stochastic heat equations of the form:
 
 where W is a cylindrical Wiener process. The project investigates methods to recover the function σ² by analyzing solution paths.
 
+For a comprehensive theoretical background on our non-parametric estimation approach, see [theory.md](theory.md), which includes:
+- Detailed mathematical formulation of the problem
+- Theoretical foundations of the partial integration method
+- Convergence properties and error bounds
+- Machine learning approach to coefficient estimation
+
 ## Experiments
 
 The `notebooks/` directory contains Pluto notebooks exploring various aspects of the SPDE solutions:
