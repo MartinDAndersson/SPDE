@@ -16,7 +16,7 @@ Random.seed!(42)
 #---------------------------------------------------
 # Define a known diffusion function
 # A fun "double bump" diffusion function
-σ(x) = 0.2 + 0.4*exp(-16*(x-0.3)^2) + 0.3*exp(-14*(x-0.7)^2)
+σ(x) = sin(x)
 truth(x) = σ(x)^2  # The squared diffusion function we want to estimate
 
 # SPDE simulation parameters
@@ -27,18 +27,20 @@ nt = 2^18      # Number of time grid points
 dx = L/(nx-1)  # Spatial grid size
 dt = tmax/(nt-1)  # Time grid size
 
+println("Generating SPDE solution...")
+# Generate solution to the SPDE
+solution = SPDE.generate_solution(σ, nx, nt)
+##
 # Estimation parameters
 x_quot = 1     # Spatial downsampling factor
 t_quot = 1     # Temporal downsampling factor
 epsilon = 4*dx   # Size of integration region
 
-println("Generating SPDE solution...")
-# Generate solution to the SPDE
-solution = SPDE.generate_solution(σ, nx, nt)
+
 sol = solution[1]#[1]
 println("Computing estimator integral...")
 # Compute the integrals for estimation
-df = SPDE.partial_integration(sol, dt, dx, x_quot, t_quot, epsilon)
+df = SPDE.partial_integration(sol, dt, dx, x_quot, t_quot, epsilon;num_samples=5000)
 
 println("Dataset size: $(size(df, 1)) points")
 

@@ -25,9 +25,19 @@ using NearestNeighborModels
 #using ScikitLearn.GridSearch: GridSearchCV
 using ProgressMeter
 using Trapz
+using PythonCall
 KNN = MLJ.@load KNNRegressor
-NeuralNetworkRegressor = MLJ.@load NeuralNetworkRegressor pkg=MLJFlux
-RandomForestRegressor = MLJ.@load RandomForestRegressor pkg=DecisionTree
+EvoTreeRegressor = MLJ.@load EvoTreeRegressor
+XGBoostRegressor = MLJ.@load XGBoostRegressor
+
+#GPR = MLJ.@load GPR pkg=MLJGaussianProcesses
+
+# GaussianProcessRegressor = MLJ.@load GaussianProcessRegressor pkg=MLJScikitLearnInterface
+# sk_kernels = pyimport("sklearn.gaussian_process.kernels")
+# Create custom kernel: RBF kernel with noise
+
+#NeuralNetworkRegressor = MLJ.@load NeuralNetworkRegressor pkg=MLJFlux
+#RandomForestRegressor = MLJ.@load RandomForestRegressor pkg=DecisionTree
 #using PyCall
 #const KNeighborsRegressor = PyNULL()
 #function __init__()
@@ -178,52 +188,52 @@ function get_drift_diffusion()
 end
 
 
-function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
-    nx, nt = size(solution)
+# function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
+#     nx, nt = size(solution)
     
-    # Calculate new step sizes
-    new_dx = x_quot * dx
-    new_dt = t_quot * dt
-    # Calculate window sizes in grid points
-    x_eps = div(eps, dx) |> Int  # Integer division (no need for |> Int)
-    t_eps = div(eps, dt) |> Int
-    x_idx = 1:x_quot:nx#[i for i in 1:new_nx]*x_quot
-    t_idx = 1:t_quot:nt#[t for t in 1:new_nt]*t_quot
-    new_sol = @view solution[x_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
-    Lu = L_op(new_sol,new_dt,new_dx) .* 1/(sqrt(2)*eps)   #.* dx .* dt #.* new_dx .* new_dt #.* sqrt(dx*dt) 
-    buffer = 1#2^13 ÷ t_quot
-    x_len,t_len = size(Lu)
-    #time_startup = 2^15 ÷ t_quot
-    max_x_points = (x_len)-x_eps-1 -(x_eps+1)
-    num_x_samples = min(10,max_x_points)
-    total_samples = min(50000,t_len*num_x_samples)
-    @show factor = t_len*num_x_samples/total_samples |> x-> ceil(Int,x)
-    results = Channel{Tuple}(Inf)
-    Threads.@threads for t in 1:factor:t_len-t_eps-10
-        rand_x = sample(x_eps+32:x_len-x_eps-32,num_x_samples,replace=false) #+ -2
-        for i in 1:num_x_samples
-            #x = rand(x_eps+1:x_len-x_eps-1)
-            x=rand_x[i]
-            integrated_view = view(Lu, x-x_eps:x+x_eps, t:t+t_eps) # right now not shifted to -1 to compensate
-            l1,l2 = size(integrated_view)
-            rx = range(0,dx*(l1),length=l1)
-            rt = range(0,dt*(l2),length=l2)
-            integrated=trapz((rx,rt),integrated_view)^2
-            #integrated = sum(integrated_view)^2
-            #plotln(integrtated)
-            #integrated = sum(Lu[x:x+x_eps-1,t:t+t_eps-1]).^2  # with time
-            #integrated = sum(Lu[x:x+x_eps-1,t]).^2 .* new_dt
-            u=new_sol[x,t]
-            put!(results, (u, integrated))
-            #push!(df,(u,integrated))
-        end
-    end
-    close(results)
-    collected_results = collect(results)
-    df = DataFrame(:x=>first.(collected_results),:y=>last.(collected_results))
-    #zipped=zip(new_sol[buffer:end-buffer,ks:end],Lu[buffer:end-buffer,ks:end]) |> collect |> x->reshape(x,:)
-    return df
-end
+#     # Calculate new step sizes
+#     new_dx = x_quot * dx
+#     new_dt = t_quot * dt
+#     # Calculate window sizes in grid points
+#     x_eps = div(eps, dx) |> Int  # Integer division (no need for |> Int)
+#     t_eps = div(eps, dt) |> Int
+#     x_idx = 1:x_quot:nx#[i for i in 1:new_nx]*x_quot
+#     t_idx = 1:t_quot:nt#[t for t in 1:new_nt]*t_quot
+#     new_sol = @view solution[x_idx,t_idx]#downsample_matrix(solution,x_quot,t_quot)
+#     Lu = L_op(new_sol,new_dt,new_dx) .* 1/(sqrt(2)*eps)   #.* dx .* dt #.* new_dx .* new_dt #.* sqrt(dx*dt) 
+#     buffer = 1#2^13 ÷ t_quot
+#     x_len,t_len = size(Lu)
+#     #time_startup = 2^15 ÷ t_quot
+#     max_x_points = (x_len)-x_eps-1 -(x_eps+1)
+#     num_x_samples = min(10,max_x_points)
+#     total_samples = min(50000,t_len*num_x_samples)
+#     @show factor = t_len*num_x_samples/total_samples |> x-> ceil(Int,x)
+#     results = Channel{Tuple}(Inf)
+#     Threads.@threads for t in 1:factor:t_len-t_eps-10
+#         rand_x = sample(x_eps+32:x_len-x_eps-32,num_x_samples,replace=false) #+ -2
+#         for i in 1:num_x_samples
+#             #x = rand(x_eps+1:x_len-x_eps-1)
+#             x=rand_x[i]
+#             integrated_view = view(Lu, x-x_eps:x+x_eps, t:t+t_eps) # right now not shifted to -1 to compensate
+#             l1,l2 = size(integrated_view)
+#             rx = range(0,new_dx*(l1),length=l1)
+#             rt = range(0,new_dt*(l2),length=l2)
+#             integrated=trapz((rx,rt),integrated_view)^2
+#             #integrated = sum(integrated_view)^2
+#             #plotln(integrtated)
+#             #integrated = sum(Lu[x:x+x_eps-1,t:t+t_eps-1]).^2  # with time
+#             #integrated = sum(Lu[x:x+x_eps-1,t]).^2 .* new_dt
+#             u=new_sol[x,t]
+#             put!(results, (u, integrated))
+#             #push!(df,(u,integrated))
+#         end
+#     end
+#     close(results)
+#     collected_results = collect(results)
+#     df = DataFrame(:x=>first.(collected_results),:y=>last.(collected_results))
+#     #zipped=zip(new_sol[buffer:end-buffer,ks:end],Lu[buffer:end-buffer,ks:end]) |> collect |> x->reshape(x,:)
+#     return df
+# end
 
 """
     partial_integration(solution, dt, dx, x_quot, t_quot, eps; num_samples=50000)
@@ -901,9 +911,63 @@ function train_tuned(df)
 	range=[knn_r1],measure=LPLoss(;p=2),
 	acceleration=CPUThreads(),
 	acceleration_resampling=CPUThreads());
-    RF = RandomForestRegressor()
-    NNR=NeuralNetworkRegressor()
-    mach = machine(knn_tuned,x_data,y_data)
+
+    evo_model = EvoTreeRegressor(
+    loss=:mse,
+    nrounds=200,
+    eta=0.05,
+    L2=0.5,
+    lambda=0.1,
+    gamma=0.1,
+    max_depth=6,
+    min_weight=2.0,
+    rowsample=0.9,
+    nbins=64
+)
+    # Create a range of hyperparameters to tune
+    r_depth = range(evo_model, :max_depth, lower=3, upper=8, scale=:linear)
+    r_eta = range(evo_model, :eta, lower=0.01, upper=0.2, scale=:log)
+    r_L2 = range(evo_model, :L2, lower=0.1, upper=1.0, scale=:linear)
+    tuned_evo = TunedModel(
+    model=evo_model,
+    resampling=CV(nfolds=5),
+    tuning=RandomSearch(rng=123),
+    range=[r_depth, r_eta, r_L2],
+    measure=rmse,
+    n=30
+)
+# Create model with parameters tuned for smoother predictions on noisy data
+xgb_model = XGBoostRegressor(
+    num_round=100,           # Number of boosting rounds
+    max_depth=3,             # Shallower trees for smoother predictions
+    eta=0.05,                # Lower learning rate for smoother predictions
+    subsample=0.8,           # Use 80% of data for each tree (reduces variance)
+    colsample_bytree=1.0,    # For 1D, use all features
+    lambda=1.0,              # L2 regularization to smooth predictions
+    alpha=0.0,               # L1 regularization (can be adjusted)
+    tree_method="hist"       # Efficient histogram-based algorithm
+)
+# Define hyperparameter ranges to tune
+r_num_round = range(xgb_model, :num_round, lower=50, upper=300, scale=:linear)
+r_max_depth = range(xgb_model, :max_depth, lower=2, upper=6, scale=:linear)
+r_eta = range(xgb_model, :eta, lower=0.01, upper=0.2, scale=:log)
+r_subsample = range(xgb_model, :subsample, lower=0.5, upper=1.0, scale=:linear)
+r_lambda = range(xgb_model, :lambda, lower=0.1, upper=5.0, scale=:log)
+r_alpha = range(xgb_model, :alpha, lower=0.0, upper=1.0, scale=:linear)
+# Set up tuning strategy
+tuned_xgb = TunedModel(
+    model=xgb_model,
+    resampling=CV(nfolds=5),
+    tuning=RandomSearch(rng=123),
+    range=[r_num_round, r_max_depth, r_eta, r_subsample, r_lambda, r_alpha],
+    measure=rmse,
+    n=30,  # Number of models to try
+    acceleration=CPUThreads()
+)
+    #gp = GPR()
+    #RF = RandomForestRegressor()
+    #NNR=NeuralNetworkRegressor()
+    mach = machine(tuned_xgb,x_data,y_data)
     fit!(mach)
     return mach
 end
