@@ -1,7 +1,35 @@
+"""
+    gpu
+
+Module implementing GPU-accelerated SPDE solvers using CUDA.
+
+This module provides functions for solving stochastic heat equations on
+GPUs, enabling much faster computation for 2D problems and large systems.
+It leverages CUDA.jl for parallel computation on NVIDIA GPUs.
+"""
 module gpu
 using DifferentialEquations, LinearAlgebra
 using CUDA
 export test
+"""
+    test(N, nt)
+
+Run a GPU-accelerated 2D stochastic heat equation solver.
+
+# Arguments
+- `N::Int`: Number of spatial grid points in each dimension (NxN grid)
+- `nt::Int`: Number of time steps
+
+# Returns
+- `Array{Float32}`: Solution array transferred from GPU to CPU
+
+This function sets up and solves a 2D stochastic heat equation with a 
+state-dependent diffusion coefficient σ(u) = sqrt(dx)*sin(πu) using CUDA.
+It implements a finite difference scheme with fixed boundary conditions
+(u=0 at boundaries) and uses the SROCK1 algorithm for time integration.
+
+The spatial discretization uses a standard 5-point stencil for the 2D Laplacian.
+"""
 function test(N,nt)
     #N=2^7
     #nt = 2^17
@@ -85,6 +113,26 @@ function test(N,nt)
     return Array(sol)
 end
 
+"""
+    test2(N, nt)
+
+Run a GPU-accelerated 1D stochastic heat equation solver.
+
+# Arguments
+- `N::Int`: Number of spatial grid points 
+- `nt::Int`: Number of time steps
+
+# Returns
+- `SciMLBase.RODESolution`: Solution object from the SDE solver
+
+This function is a 1D variant of the `test` function, solving a one-dimensional
+stochastic heat equation with a state-dependent diffusion coefficient σ(u) = sin(πu).
+It uses CUDA for GPU acceleration and implements a finite difference scheme with
+fixed boundary conditions (u=0 at boundaries).
+
+This implementation is useful for comparison with the 2D version to study
+performance scaling and for simpler test cases.
+"""
 function test2(N,nt)
     #N=2^7
     #nt = 2^17

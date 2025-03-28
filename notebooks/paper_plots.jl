@@ -470,14 +470,8 @@ mean_fun = (glob("*0.00782*"*sigma*"*",datadir("machines")) .|> machine .|> SPDE
 # ╔═╡ 7517cd1d-4733-4829-aaa6-3c8a2e20b8e8
 4*dx
 
-# ╔═╡ e54c6768-fcfc-411b-97a4-927bb8e00a2c
-A=rand(3,3)
-
 # ╔═╡ 18f971be-5a24-47ed-bced-b7370ec2da58
 range(0,2*3,length=100)
-
-# ╔═╡ 9020b6ac-f1b6-40d3-b105-7dd6a62847e0
-size(A)
 
 # ╔═╡ 5413c0f0-6648-4676-a105-0527cbf66ad2
 ests
@@ -518,32 +512,52 @@ glob(pattern,datadir("machines"))[idx]
 # ╔═╡ 05e4d89a-b751-4582-b428-312adbd0af5e
 #SPDE.get_all_losses( machine.(paths)[1],truth,(0.5,5),1000)
 
+# ╔═╡ 9020b6ac-f1b6-40d3-b105-7dd6a62847e0
+#=╠═╡
+size(A)
+  ╠═╡ =#
+
+# ╔═╡ f899052b-fffe-49df-9e74-11994b30083f
+#=╠═╡
+xs,ts = size(A)
+  ╠═╡ =#
+
+# ╔═╡ cd9af91e-bc8f-4559-8d5d-6938c2606ae8
+#=╠═╡
+l1,l2 = (dx*xs,dt*ts)
+  ╠═╡ =#
+
+# ╔═╡ 6b92f6f6-b575-4da9-9269-dac9e7260e4e
+#=╠═╡
+begin
+	xran=range(0,l1,length=xs)
+	yran=range(0,l2,length=ts)
+end
+  ╠═╡ =#
+
+# ╔═╡ 79a51857-5e3f-4f90-845a-50b1f35abc8e
+
+
+# ╔═╡ 982dbd22-28f6-4b2d-84da-36b4305e3f8e
+#=╠═╡
+trapz((xran,yran),A)
+  ╠═╡ =#
+
+# ╔═╡ 3e06f4da-0c9d-42b8-ba02-c9726aaa581c
+#=╠═╡
+trapz((1:xs,1:ts),dt*dx*A)
+  ╠═╡ =#
+
 # ╔═╡ af4d8058-5fd3-4f91-ad9b-a8db7ffc3b44
 # ╠═╡ disabled = true
 #=╠═╡
 A = rand(10,10)
   ╠═╡ =#
 
-# ╔═╡ f899052b-fffe-49df-9e74-11994b30083f
-xs,ts = size(A)
-
-# ╔═╡ cd9af91e-bc8f-4559-8d5d-6938c2606ae8
-l1,l2 = (dx*xs,dt*ts)
-
-# ╔═╡ 6b92f6f6-b575-4da9-9269-dac9e7260e4e
-begin
-	xran=range(0,l1,length=xs)
-	yran=range(0,l2,length=ts)
-end
-
-# ╔═╡ 79a51857-5e3f-4f90-845a-50b1f35abc8e
-
-
-# ╔═╡ 982dbd22-28f6-4b2d-84da-36b4305e3f8e
-trapz((xran,yran),A)
-
-# ╔═╡ 3e06f4da-0c9d-42b8-ba02-c9726aaa581c
-trapz((1:xs,1:ts),dt*dx*A)
+# ╔═╡ e54c6768-fcfc-411b-97a4-927bb8e00a2c
+#=╠═╡
+A=rand(3,3)
+  ╠═╡ =#
 
 # ╔═╡ Cell order:
 # ╠═695bfa62-da5a-4f72-a975-edabb5aabfb0

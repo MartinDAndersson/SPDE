@@ -1,3 +1,18 @@
+"""
+    highdim
+
+Module for handling higher-dimensional stochastic partial differential equations.
+
+This module provides tools for generating, analyzing, and estimating diffusion
+coefficients in 2D and higher dimensional SPDEs. It includes specialized versions
+of the core algorithms that work with multi-dimensional data.
+
+Key functionality includes:
+- Multi-dimensional L-operator implementation
+- SPDE solution generation for 2D problems
+- Partial integration methods for higher dimensions
+- GPU-accelerated computation for large systems
+"""
 module highdim
 using LinearAlgebra, Random, Distributions, DifferentialEquations, LsqFit
 using SparseArrays
@@ -16,6 +31,27 @@ using Trapz
 export f
 f(x) = 3
 
+"""
+    L_op(u, dt, dx)
+
+Apply the differential operator to a 3D solution tensor to extract information 
+about the diffusion coefficient in a 2D SPDE.
+
+This operator implements: L[u] = ∂u/∂t - (1/2)∇²u 
+where ∇² is the 2D Laplacian operator (∂²/∂x² + ∂²/∂y²)
+
+# Arguments
+- `u::Array{Float64,3}`: Solution tensor with dimensions (x, y, time)
+- `dt::Float64`: Time step size
+- `dx::Float64`: Space step size (assumed equal in x and y)
+
+# Returns
+- `Lu::Array{Float64,3}`: Tensor with the operator applied at each valid point
+
+This function uses first-order finite differences for time derivatives and 
+second-order central differences for spatial derivatives in both x and y dimensions.
+The implementation is multi-threaded for performance with large arrays.
+"""
 function L_op(u,dt,dx)
     Lu = similar(u)
     nnx,nnxy,nnt = size(u)
@@ -32,7 +68,28 @@ function L_op(u,dt,dx)
     end
     return Lu
 end
-#2^27
+"""
+    generate_solution(σ, h, nt)
+
+Generate numerical solutions to a 2D stochastic heat equation.
+
+# Arguments
+- `σ::Function`: Diffusion coefficient function
+- `h::Int`: Number of spatial grid points in each dimension (h×h grid)
+- `nt::Int`: Number of time steps
+
+# Returns
+- `solution::RODESolution`: Solution from the SDE solver
+
+This function solves the 2D stochastic heat equation:
+∂u/∂t = (1/2)∇²u + σ(u)∂W/∂t
+
+where ∇² is the 2D Laplacian. It uses the SROCK1 algorithm, which provides
+good stability properties for stiff stochastic systems.
+
+The implementation uses Symbolics.jl to automatically generate the Jacobian
+sparsity pattern, which improves solver performance.
+"""
 function generate_solution(σ,h,nt)
     #algo = ImplicitRKMil(linsolve = KLUFactorization())#(linsolve = KLUFactorization())
     algo = SROCK1()
@@ -111,6 +168,26 @@ function test()
     return mach,df,truth
 end
 
+"""
+    partial_integration(solution, dt, dx, x_quot, t_quot, eps)
+
+Perform the partial integration method for 2D SPDEs to extract diffusion coefficient information.
+
+# Arguments
+- `solution::Array{Float64,3}`: 3D solution tensor with dimensions (x, y, time)
+- `dt::Float64`: Time step size of the original solution
+- `dx::Float64`: Space step size of the original solution (assumed equal in x and y)
+- `x_quot::Int`: Spatial downsampling factor (applied to both x and y dimensions)
+- `t_quot::Int`: Temporal downsampling factor
+- `eps::Float64`: Size of the local integration window (in original dx units)
+
+# Returns
+- `df::DataFrame`: DataFrame with columns :x (u values) and :y (corresponding estimated σ²(u) values)
+
+This is the 2D version of the partial integration algorithm, extending the 1D method to
+handle 2D spatial domains. It uses multi-dimensional numerical integration via the Trapz
+package and parallelizes computation with Julia's threading.
+"""
 function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
 	#eps = 4*dx
     #solution = Array(solution)
@@ -155,6 +232,24 @@ function partial_integration(solution,dt,dx,x_quot,t_quot,eps)
     return df
 end
 
+"""
+    partial_new(sol, dt, dx, eps)
+
+Alternative implementation of the partial integration method using fixed spatial locations.
+
+# Arguments
+- `sol::Array{Float64,3}`: 3D solution tensor
+- `dt::Float64`: Time step size
+- `dx::Float64`: Space step size
+- `eps::Int`: Size of integration window in grid points
+
+# Returns
+- `df::DataFrame`: DataFrame with (u, σ²(u)) data points
+
+This function is an experimental alternative to the main partial_integration method,
+using a fixed spatial location (at 1/4 of the domain) rather than random sampling.
+It provides a simpler implementation for testing and comparison.
+"""
 function partial_new(sol,dt,dx,eps)
     nx,ny,nt = size(sol)
     #Lu = similar(sol)
@@ -184,6 +279,21 @@ function partial_new(sol,dt,dx,eps)
     return df 
 end
 
+"""
+    drift!(du, u, p, t)
+
+Implements the deterministic part (Laplacian) of the 2D stochastic heat equation.
+
+# Arguments
+- `du::Array{Float64,2}`: Output array for the drift term
+- `u::Array{Float64,2}`: Current solution state
+- `p::Tuple`: Parameters (dx, σ, N) where dx is the grid spacing, σ is the diffusion function, 
+              and N is the grid size
+- `t::Float64`: Current time
+
+This function computes ∇²u, the 2D Laplacian of u, using finite differences.
+It sets zero Dirichlet boundary conditions at the domain boundaries.
+"""
 function drift!(du,u,p,t)
     dx,σ = p
     du[1,:] .= 0
@@ -201,11 +311,38 @@ function drift!(du,u,p,t)
 end
 
 
+"""
+    mach_to_func(mach)
+
+Convert an MLJ machine into a callable function for evaluation.
+
+# Arguments
+- `mach::Machine`: Trained MLJ machine
+
+# Returns
+- `est_wrapper::Function`: Function that takes a single value and returns the model prediction
+"""
 function mach_to_func(mach)
 	est_wrapper(x) = MLJ.predict(mach,DataFrame(:x=>[x]))[1]
 	return est_wrapper
 end
-# ╔═╡ dc5c0a94-38ac-4f86-ab6e-626eaed699fc
+
+"""
+    noise!(du, u, p, t)
+
+Implements the stochastic part of the 2D stochastic heat equation.
+
+# Arguments
+- `du::Array{Float64,2}`: Output array for the noise term
+- `u::Array{Float64,2}`: Current solution state
+- `p::Tuple`: Parameters (dx, σ, N) where dx is the grid spacing, σ is the diffusion function, 
+              and N is the grid size
+- `t::Float64`: Current time
+
+This function computes σ(u) * sqrt(1/dx²), implementing the state-dependent 
+diffusion coefficient for the noise term. It uses broadcasting for efficient
+vectorized computation.
+"""
 function noise!(du,u,p,t)
     dx,σ,N = p
     #@inbounds for i in 2:N-1
@@ -216,6 +353,24 @@ function noise!(du,u,p,t)
     du .= σ.(u) .* sqrt(1/dx^2)
 end
 
+"""
+    train_tuned(df)
+
+Train a k-nearest neighbor regression model with hyperparameter tuning for 2D SPDEs.
+
+# Arguments
+- `df::DataFrame`: DataFrame with columns :x (feature values) and :y (target values)
+
+# Returns
+- `mach::Machine`: Trained MLJ machine with optimized hyperparameters
+
+This function creates a tuned k-nearest neighbors model with cross-validation,
+optimizing the number of neighbors and leaf size for best performance.
+It filters very large values (>15) that may represent outliers or boundary effects.
+
+The model is trained to predict the squared diffusion coefficient σ²(u)
+from solution values u in the context of 2D SPDEs.
+"""
 function train_tuned(df)
 	df_filtered = filter(row -> row.x < 15, df)
 	#df_train,df_test = partition(df_filtered  ,0.8,rng=123)
@@ -238,6 +393,26 @@ function train_tuned(df)
     return mach
 end
 
+"""
+    gpu_generation(σ, h, nt)
+
+Generate solutions to 2D SPDEs with optimized GPU computation.
+
+# Arguments
+- `σ::Function`: Diffusion coefficient function
+- `h::Int`: Number of spatial grid points in each dimension (h×h grid)
+- `nt::Int`: Number of time steps
+
+# Returns
+- `solution::RODESolution`: Solution from the SDE solver
+
+This function is similar to generate_solution, but with settings optimized
+for GPU computation with large 2D systems. It uses the SROCK1 algorithm
+with automatic Jacobian sparsity detection via Symbolics.jl.
+
+This is typically used for larger spatial domains where GPU acceleration
+provides significant performance benefits.
+"""
 function gpu_generation(σ,h,nt)
     algo = SROCK1()#ImplicitRKMil(linsolve = KLUFactorization())
     L=1; 
